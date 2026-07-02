@@ -28,10 +28,10 @@ Cursor rule: [`.cursor/rules/60-orchestrator.mdc`](.cursor/rules/60-orchestrator
 
 | Репо | Git | Когда трогать |
 |---|---|---|
-| `muru-backend-local` | `MURU_miniAPP` remote, ветка впереди прода | Новые API, миграции, web-канал, CRM-ядро |
-| `MURU_miniAPP` | Прод | Хотфиксы на VPS; всё форвард-портить в local |
-| `muru-storefront` | Инициализировать git | UI витрины, SEO, чекаут, каталог |
-| `muru-docs` | Версионировать git | После каждой проверенной сессии |
+| `muru-backend-local` | `VasiliiLbyte/muru-backend-local`, ветка `storefront-integration` | Новые API, миграции, web-канал, CRM-ядро |
+| `MURU_miniAPP` | `VasiliiLbyte/MURU_miniAPP`, `master` | Прод на Beget; хотфиксы — forward-port в local |
+| `muru-storefront` | `VasiliiLbyte/muru-storefront` | UI витрины, SEO, чекаут |
+| `muru-docs` | `VasiliiLbyte/muru-docs` | После каждой проверенной сессии |
 
 **Порядок при зависимостях:** бэкенд (`muru-backend-local`) → витрина (`muru-storefront`) → прод (`MURU_miniAPP`).
 
@@ -134,7 +134,14 @@ npm run build  # или tsc --noEmit
 
 Оркестратор обновляет `PROGRESS.md`:
 - «Сделано» / «Следующее» / «Блокеры»
+- **Pending deploy** — если задача затрагивает прод (новая строка или статус `deployed`)
 - Строка в «Лог сессий» с датой и ID промптов
+
+Чеклист конца сессии:
+- [ ] PROGRESS актуален
+- [ ] Pending deploy актуален (если был prod-scope)
+- [ ] Forward-port выполнен или запланирован ([`FORWARD_PORT.md`](FORWARD_PORT.md))
+- [ ] Лог сессий дополнен
 
 Новый чат — с тем же стартовым промптом.
 
@@ -153,15 +160,17 @@ npm run build  # или tsc --noEmit
 |---|---|
 | **Git в `muru-docs`** | История решений, diff прогресса, откат формулировок |
 | **Git в `muru-storefront`** | Нормальные PR, diff для оркестратора |
-| **`API_CONTRACT.md`** | ✅ Эндпоинты web/telegram, envelope, snapshot — [`API_CONTRACT.md`](API_CONTRACT.md) |
-| **`DEPLOY.md`** | ✅ Чеклист VPS, миграции, env — [`DEPLOY.md`](DEPLOY.md) |
+| **`API_CONTRACT.md`** | ✅ [`API_CONTRACT.md`](API_CONTRACT.md) |
+| **`DEPLOY.md`** | ✅ [`DEPLOY.md`](DEPLOY.md) |
+| **`FORWARD_PORT.md`** | ✅ [`FORWARD_PORT.md`](FORWARD_PORT.md) — синхронизация local ↔ miniAPP |
+| **`55-executor.mdc`** | ✅ в `muru-backend-local` и `muru-storefront` — правила исполнителя |
 | **Нумерация промптов** | `2026-07-03-01` в логе — быстрый поиск |
-| **Чеклист перед прод-деплоем** | Миграция 014, web YK, CORS, `orders/create` удалён, гидрация корзины |
+| **Pending deploy** | ✅ таблица в `PROGRESS.md` |
+| **Чеклист перед прод-деплоем** | `DEPLOY.md` + строки `DEP-xxx` в PROGRESS |
 
 ### Опционально (когда вырастет нагрузка)
 
 - **`TASKS.md`** — очередь на 5–10 пунктов вперёд (PROGRESS остаётся статусом)
-- **Шаблон «форвард-порт»** — один промпт = изменения в local + зеркало в MURU_miniAPP
 - **Bugbot / security-review** в Cursor — перед мержем payment/auth в прод
 - **E2E-чеклист в PROGRESS** — не гонять полный чекаут, если не менялась оплата/CDEK
 
@@ -200,7 +209,7 @@ Auto **не заменит** архитектурные решения по CRM 
 | Обновить PROGRESS до проверки | Сначала read/verify, потом лог |
 | Два репо в одном промпте без «форвард-порт» | Два промпта по порядку |
 | Новый чат без чтения PROGRESS | Стартовый промпт из §5 |
-| Деплой без записи в DEPLOY/PROGRESS | Явный пункт «деплой за Василием» |
+| Деплой без записи в DEPLOY/PROGRESS | Явный пункт в **Pending deploy** (`DEP-xxx`) |
 
 ---
 
@@ -211,6 +220,18 @@ Auto **не заменит** архитектурные решения по CRM 
 **Блокер cutover:** mock-only `/products/by-sku/:sku` ломает корзину в проде.
 
 **Не в v1 (470k):** блок SPEC v0.2 (воронка, RFM, брошенные корзины) — отдельная фаза/бюджет.
+
+---
+
+## 10. Forward-Port (синхронизация бэкенд-репо)
+
+Когда фича в `muru-backend-local` должна попасть в прод Mini App — или хотфикс в `MURU_miniAPP` нужно зеркалировать в local:
+
+- Полный протокол, чеклист и шаблон промпта: [`FORWARD_PORT.md`](FORWARD_PORT.md)
+- После verify — строка в `PROGRESS.md` → **Pending deploy**
+- Оркестратор выдаёт промпт с суффиксом `-fp` (forward-port)
+
+**Не путать** с работой в `muru-storefront` — витрина не требует forward-port в miniAPP (до общего cutover API).
 
 ---
 

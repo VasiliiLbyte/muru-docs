@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-02 (сессия 2)
+Последнее обновление: 2026-07-02 (сессия 3 — forward-port, executor rules, pending deploy)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -43,8 +43,20 @@
 ## Блокеры
 - Гидрация корзины по SKU висит на mock-only эндпоинте (см. Следующее) — блокирует прод-cutover, не блокирует текущий dev.
 
+## Ожидает деплоя (Pending deploy)
+
+Живой статус: что **закоммичено и verified**, но ещё **не на VPS** (или не на prod-БД). Детали команд — [`DEPLOY.md`](DEPLOY.md). Протокол синхронизации репо — [`FORWARD_PORT.md`](FORWARD_PORT.md).
+
+| ID | Изменение | Репо / ветка | Код | VPS | Действие | Заметки |
+|---|---|---|---|---|---|---|
+| DEP-001 | Удаление небезопасного `POST /orders/create` (бэк + фронт mini app) | `MURU_miniAPP` / `master` | verified | not deployed | `cd /var/www/muru && git pull && bash deploy.sh` | Коммит `9e8e8e0`; forward-port из local выполнен 2026-07-02 |
+| DEP-002 | Миграция `014_web_identity.sql` (web-канал, nullable telegram_user_id) | SQL в обоих бэкенд-репо | verified (local DB) | not applied | `psql "$DATABASE_URL" -f backend/src/db/migrations/014_web_identity.sql` на VPS | Применять **до** деплоя web API на прод |
+| DEP-003 | Web checkout API (`/payments/web/*`, `/cdek/web/calculate`, channel-aware YK) | `muru-backend-local` / `storefront-integration` | verified (local) | not deployed | Не деплоить на VPS до cutover-плана | Не forward-portить web-only код в miniAPP до согласования |
+
+**Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
+
 ## Бэклог (не терять)
-- Деплой на VPS (за Василием): форвард-порт orders/create (бэк+фронт Mini App), миграция 014 при переезде.
+- Деплой на VPS — см. таблицу **Pending deploy** выше (`DEP-001`, `DEP-002`).
 - Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко.
 - Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
@@ -58,3 +70,4 @@
 - **2026-07-01 (сессия 2)**: шаг 4 закрыт по фронту. Бэкенд оказался уже полностью CDEK-ready — изменений не потребовалось. Фронт: Leaflet PvzMap, CDEK в `checkout-view`, `/checkout/return`, уборка заглушки. Оба репо tsc-чисты. Дальше — 4c-be (раздельные Shop ID) в новом чате.
 - **2026-07-02**: 4c-be выполнен (channel — обязательный параметр YK-клиента, pre-SELECT в fulfill, 32/32 теста). Бонусом: in_stock-чек в pricing (+2 теста), форвард-порт удаления orders/create в прод-репо (бэк+фронт, tsc чист, деплой за Василием). Разобраны env-проблемы e2e: пустые CDEK_*/DADATA_* в backend/.env, отсутствовавшие YOOKASSA_WEB_RETURN_URL и NEXT_PUBLIC_API_BASE (витрина сидела на MSW). Ручной прогон: города и ПВЗ работают, расчёт стоимости доставки — НЕТ → блокер, дебаг в новом чате.
 - **2026-07-02 (сессия 2)**: CDEK-блокер закрыт — код был рабочий с самого начала (curl подтвердил расчёт: door 615₽, pvz 420₽), симптом был из-за пустых кредов на момент прошлого теста. Василий вручную прогнал полный e2e (город→ПВЗ/дверь→расчёт→оплата 5555…4477→`/checkout/return`) — успешно. По пути найдена и закрыта новая проблема: главная (`/`) отдавала 500, т.к. `NEXT_PUBLIC_API_BASE` отключил MSW целиком, а контентные эндпоинты (`/collections`, `/lookbooks`, `/pages`, `/categories`, `/products*`) существуют только в фикстурах — на бэке их нет. Фикс в 2 шага: (1) гибридный `shouldServerMock()` в `client.ts` — контентные mock-only префиксы резолвятся из фикстур даже при заданном `API_BASE`, plus passthrough-хендлеры для `*/catalog/products*` в MSW, чтобы wildcard `*/products` их не перехватывал; (2) контент (`collections`/`lookbooks`/`pages`) вынесен из `src/mocks/fixtures` в `src/lib/content/` как статичный модуль без HTTP — `getCollections/getLookbooks/getPage` в `endpoints.ts` теперь возвращают его напрямую, `mocks/fixtures/*` стали реэкспортами для обратной совместимости с MSW-хендлерами/резолвером. Оба репо tsc-чисты, все страницы (`/`, `/catalog`, `/basket`, `/lookbooks/*`, `/landings/*`, `/company/*`) → 200. Важный найденный prod-блокер (не в этой сессии): `hydrate.ts` (корзина/мини-корзина/избранное/чекаут) всё ещё ходит на mock-only `/products/by-sku/:sku` — работает в dev только благодаря browser MSW; в проде сломается. Следующий шаг — в новом чате.
+- **2026-07-02 (сессия 3)**: Документация процесса: `FORWARD_PORT.md`, `55-executor.mdc` в backend-local и storefront, секция Pending deploy (`DEP-001`..`003`) в PROGRESS. GitHub remotes выровнены. Пуш muru-docs (API_CONTRACT, DEPLOY). Готовность к оркестратору в workspace muru-docs.

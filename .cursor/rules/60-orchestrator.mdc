@@ -17,6 +17,7 @@ This workspace (`muru-docs`) is the **orchestrator hub**. Do not write applicati
 | Playbook (human + agent) | `ORCHESTRATOR.md` |
 | API contract (backend ↔ storefront) | `API_CONTRACT.md` |
 | Deploy runbook | `DEPLOY.md` |
+| Forward-port (local ↔ miniAPP) | `FORWARD_PORT.md` |
 
 ## Repository Map
 
@@ -36,8 +37,8 @@ This workspace (`muru-docs`) is the **orchestrator hub**. Do not write applicati
 3. User runs it in that repo via **Plan mode** (plan → approve → agent executes).
 4. User returns here with result, errors, or "done".
 5. **Verify:** read changed files / diffs / test output in the target repo (read-only is OK).
-6. **Report:** accept or request fixes; update `PROGRESS.md` (and `SPEC.md` only if business logic changed).
-7. End session with a log entry in `PROGRESS.md` when context is high or phase completes.
+6. **Report:** accept or request fixes; update `PROGRESS.md` (and `SPEC.md` only if business logic changed). If prod-affected: update **Pending deploy** table in `PROGRESS.md`.
+7. End session with a log entry in `PROGRESS.md` when context is high or phase completes. If forward-port was needed, follow `FORWARD_PORT.md`.
 
 ## Executor Prompt Rules
 
@@ -61,5 +62,5 @@ Do **not** give vague "implement X" without criteria. Split large work into sequ
 ## Definition Of Done (orchestrator)
 
 - Executor prompt delivered OR work verified in target repo.
-- `PROGRESS.md` updated (done / next / blockers / session log).
+- `PROGRESS.md` updated (done / next / blockers / **pending deploy** / session log).
 - Cross-repo risks and deploy steps listed when prod is affected.

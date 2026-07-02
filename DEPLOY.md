@@ -101,13 +101,23 @@ mkdir -p /var/www/muru/cache/img
 
 ---
 
-## 3. Ожидающий деплой (из PROGRESS, за Василием)
+## 3. Ожидающий деплой (живой статус)
 
-| Изменение | Репо | Что сделать |
-|---|---|---|
-| Удаление `POST /orders/create` | `MURU_miniAPP` | `git pull` + `deploy.sh` (бэк + пересборка фронта) |
-| Миграция `014_web_identity.sql` | VPS PostgreSQL | Применить перед web-каналом в проде |
-| Web checkout APIs (`storefront-integration`) | Пока **не** на VPS prod | Деплоить после cutover-плана |
+**Источник правды:** [`PROGRESS.md`](PROGRESS.md) → секция **«Ожидает деплоя (Pending deploy)»**.
+
+Таблица `DEP-xxx` отслеживает: код verified в git, но ещё не на VPS / не в prod-БД. Команды деплоя — в §2 ниже; протокол синхронизации репо — [`FORWARD_PORT.md`](FORWARD_PORT.md).
+
+После успешного деплоя Василий сообщает оркестратору → строка помечается `deployed`, переносится в «Сделано» в PROGRESS.
+
+### Текущие pending (на 2026-07-02)
+
+См. актуальную таблицу в PROGRESS. На момент написания:
+
+| ID | Кратко |
+|---|---|
+| DEP-001 | Удаление `POST /orders/create` — код в `MURU_miniAPP`, VPS pending |
+| DEP-002 | Миграция `014_web_identity.sql` — local OK, VPS DB pending |
+| DEP-003 | Web checkout API — только local, не на VPS до cutover |
 
 ---
 
@@ -250,3 +260,4 @@ flowchart LR
 |---|---|
 | 2026-07-02 | Первая версия runbook |
 | 2026-07-02 | `muru-backend-local` remote → отдельный GitHub-репо |
+| 2026-07-02 | Pending deploy — живой статус в PROGRESS.md |
