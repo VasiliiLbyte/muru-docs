@@ -153,8 +153,8 @@ npm run build  # или tsc --noEmit
 |---|---|
 | **Git в `muru-docs`** | История решений, diff прогресса, откат формулировок |
 | **Git в `muru-storefront`** | Нормальные PR, diff для оркестратора |
-| **`muru-docs/API_CONTRACT.md`** | Эндпоинты web/telegram, envelope, поля snapshot — один источник для бэка и витрины |
-| **`muru-docs/DEPLOY.md`** | Чеклист VPS: миграции, env, nginx, что за Василием |
+| **`API_CONTRACT.md`** | ✅ Эндпоинты web/telegram, envelope, snapshot — [`API_CONTRACT.md`](API_CONTRACT.md) |
+| **`DEPLOY.md`** | ✅ Чеклист VPS, миграции, env — [`DEPLOY.md`](DEPLOY.md) |
 | **Нумерация промптов** | `2026-07-03-01` в логе — быстрый поиск |
 | **Чеклист перед прод-деплоем** | Миграция 014, web YK, CORS, `orders/create` удалён, гидрация корзины |
 
