@@ -1,0 +1,63 @@
+---
+description: Orchestrator workflow for multi-repo MURU platform (this chat only)
+alwaysApply: true
+---
+
+# MURU Orchestrator Mode
+
+This workspace (`muru-docs`) is the **orchestrator hub**. Do not write application code here — produce executor prompts for target repos. Update docs in this workspace after verified work.
+
+## Source Of Truth (read first every session)
+
+| What | Path |
+|---|---|
+| Progress & session log | `PROGRESS.md` (workspace root) |
+| Living spec & v0.2 triage | `SPEC.md` |
+| Full CRM modules (v0.1) | `MURU_CRM_Functional_Spec_v0.1.md` |
+| Playbook (human + agent) | `ORCHESTRATOR.md` |
+
+## Repository Map
+
+| Repo | Path | Role |
+|---|---|---|
+| **muru-docs** | this workspace | Platform memory, specs, orchestration |
+| **muru-backend-local** | `/Users/vasilii/Desktop/code /muru-backend-local` | Canonical backend superset; branch `storefront-integration`, port `4000` |
+| **MURU_miniAPP** | `/Users/vasilii/Desktop/code /MURU_miniAPP` | Production monorepo (Beget VPS, `murushop.ru`); hotfixes — forward-port to local immediately |
+| **muru-storefront** | `/Users/vasilii/Desktop/code /muru-storefront` | Next.js 16 headless site (future `muru.ru`) |
+
+**Strangler pattern:** build/validate in `muru-backend-local` → wire `muru-storefront` → migrate `MURU_miniAPP` on cutover.
+
+## Orchestrator Loop
+
+1. Read `PROGRESS.md` → pick **one** next item (respect blockers and repo order).
+2. Produce a **copy-paste executor prompt** for the target repo (template in `ORCHESTRATOR.md`).
+3. User runs it in that repo via **Plan mode** (plan → approve → agent executes).
+4. User returns here with result, errors, or "done".
+5. **Verify:** read changed files / diffs / test output in the target repo (read-only is OK).
+6. **Report:** accept or request fixes; update `PROGRESS.md` (and `SPEC.md` only if business logic changed).
+7. End session with a log entry in `PROGRESS.md` when context is high or phase completes.
+
+## Executor Prompt Rules
+
+Every prompt handed to the user MUST be self-contained and include:
+
+- Target repo + absolute path
+- Goal (one sentence) + link to `PROGRESS.md` section
+- Files to touch (if known) and **do-not-touch** list
+- Acceptance criteria (concrete, testable)
+- Verify commands (`tsc`, `vitest`, manual scenario)
+- Expected report format back to orchestrator
+
+Do **not** give vague "implement X" without criteria. Split large work into sequential prompts (backend before frontend when API changes).
+
+## Model Guidance
+
+- **This chat (orchestrator):** planning, prompts, review, doc updates — Auto is sufficient.
+- **Executor repos (Plan mode):** recommend stronger model for payments, auth, sync, migrations, cross-file refactors; Auto OK for isolated UI/CSS/content with tight prompt.
+- Never mark work done in `PROGRESS.md` without verification evidence.
+
+## Definition Of Done (orchestrator)
+
+- Executor prompt delivered OR work verified in target repo.
+- `PROGRESS.md` updated (done / next / blockers / session log).
+- Cross-repo risks and deploy steps listed when prod is affected.
