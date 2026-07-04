@@ -2,7 +2,7 @@
 
 Единый контракт между **каноническим бэкендом** (`muru-backend-local`, порт `4000`) и **витриной** (`muru-storefront`).
 
-**Версия:** 2026-07-02  
+**Версия:** 2026-07-04  
 **Источник правды в коде:** `muru-backend-local/backend/src`, `muru-storefront/src/lib/api`, `muru-storefront/src/lib/schemas`
 
 При изменении эндпоинтов или полей — обновлять этот файл **и** `PROGRESS.md` (лог сессии).
@@ -37,7 +37,7 @@
 
 Бэкенд разрешает origin из allowlist (`index.ts`):
 
-- Прод: `murushop.ru`, `murushop.online`, `muru-blue.vercel.app` + `ALLOWED_ORIGINS`
+- Прод: `murushop.ru`, `murushop.online`, `web.murushop.ru`, `muru-blue.vercel.app` + `ALLOWED_ORIGINS`
 - Dev: `localhost:3000`, `localhost:5173`, `localhost:4173`
 
 Перед go-live витрины на `muru.ru` — добавить домен в `ALLOWED_ORIGINS` на VPS.
@@ -57,12 +57,12 @@
 
 Префикс: `/api/catalog`
 
-| Метод | Путь | Storefront | Описание |
-|---|---|---|---|
-| `GET` | `/tree?subcategories=1` | `fetchCatalogTree()` | Дерево категорий (2 уровня) |
-| `GET` | `/products` | `fetchCatalogProducts()` | Список товаров |
-| `GET` | `/products/:sku` | `fetchCatalogProductBySku(sku)` | Карточка по SKU (uppercase на бэке) |
-| `POST` | `/restock-notify` | — | Уведомление о поступлении (Telegram) |
+| Метод | Путь | Storefront | Rate limit | Описание |
+|---|---|---|---|---|
+| `GET` | `/tree?subcategories=1` | `fetchCatalogTree()` | — | Дерево категорий (2 уровня) |
+| `GET` | `/products` | `fetchCatalogProducts()` | — | Список товаров |
+| `GET` | `/products/:sku` | `fetchCatalogProductBySku(sku)` | — | Карточка по SKU (uppercase на бэке) |
+| `POST` | `/restock-notify` | — | 5/min IP | Уведомление о поступлении (Telegram) |
 
 ### Query `/products` (опционально)
 
@@ -165,7 +165,7 @@ Storefront: поллинг на `/checkout/return/` (3с × 40 попыток).
 | `GET` | `/cities?q=` | нет | 60/min IP | `getCdekCities()` |
 | `GET` | `/tariff-list` | нет | 30/min IP | — |
 | `GET` | `/address-suggest?q=&city=` | нет | 60/min IP | `getCdekAddressSuggestions()` |
-| `GET` | `/pickup-points?cityCode=` | нет | — | `getCdekPvz()` |
+| `GET` | `/pickup-points?cityCode=` | нет | 30/min IP | `getCdekPvz()` |
 | `POST` | `/web/calculate` | нет | 20/min IP | `calculateCdekWeb()` |
 | `POST` | `/calculate` | JWT | 20/min user/IP | Mini App only |
 

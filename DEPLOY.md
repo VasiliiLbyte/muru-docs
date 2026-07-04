@@ -2,7 +2,7 @@
 
 Операционный чеклист деплоя. Детали API — в [`API_CONTRACT.md`](API_CONTRACT.md). Статус работ — в [`PROGRESS.md`](PROGRESS.md).
 
-**Версия:** 2026-07-02
+**Версия:** 2026-07-04
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|---|
 | Mini App + API (прод) | `MURU_miniAPP` | `VasiliiLbyte/MURU_miniAPP` | Beget VPS `/var/www/muru` |
 | Канонический бэкенд (dev) | `muru-backend-local` | `VasiliiLbyte/muru-backend-local` | Локально `:4000`, ветка `storefront-integration` |
-| Витрина (dev → будущий muru.ru) | `muru-storefront` | `VasiliiLbyte/muru-storefront` | Локально `:3000`, хостинг TBD |
+| Витрина (staging → будущий muru.ru) | `muru-storefront` | `VasiliiLbyte/muru-storefront` | Beget VPS `/var/www/muru-storefront`, PM2 `muru-storefront`; локально `:3000` |
 | Документация / оркестратор | `muru-docs` | `VasiliiLbyte/muru-docs` | Git only |
 
 **Домены (прод сегодня):**
@@ -21,6 +21,7 @@
 |---|---|
 | `murushop.ru` | Mini App + API (canonical) |
 | `murushop.online` | Редирект / YooKassa test webhook |
+| `web.murushop.ru` | Staging витрина (Next.js, `muru-storefront`) |
 | `muru.ru` | Bitrix (выводится) → заменит `muru-storefront` |
 
 ---
@@ -109,16 +110,6 @@ mkdir -p /var/www/muru/cache/img
 
 После успешного деплоя Василий сообщает оркестратору → строка помечается `deployed`, переносится в «Сделано» в PROGRESS.
 
-### Текущие pending (на 2026-07-02)
-
-См. актуальную таблицу в PROGRESS. На момент написания:
-
-| ID | Кратко |
-|---|---|
-| DEP-001 | Удаление `POST /orders/create` — код в `MURU_miniAPP`, VPS pending |
-| DEP-002 | Миграция `014_web_identity.sql` — local OK, VPS DB pending |
-| DEP-003 | Web checkout API — только local, не на VPS до cutover |
-
 ---
 
 ## 4. Миграции БД
@@ -169,7 +160,25 @@ pm2 reload ecosystem.config.js --update-env
 
 ---
 
-## 6. Storefront (будущий muru.ru)
+## 6. Storefront (staging + будущий muru.ru)
+
+### Staging (live)
+
+**URL:** `https://web.murushop.ru`  
+**Путь на VPS:** `/var/www/muru-storefront`  
+**PM2:** `muru-storefront`
+
+```bash
+cd /var/www/muru-storefront
+git pull origin main
+npm ci
+NODE_OPTIONS=--max-old-space-size=2048 npm run build
+npm ci --omit=dev
+pm2 restart muru-storefront
+pm2 save
+```
+
+> Бэкенд на VPS должен быть жив на время `npm run build` — `sitemap.xml` ходит в API. Меню каталога (`catalog-menu`) при недоступном API деградирует мягко (DEP-007).
 
 ### Локальная разработка
 
@@ -184,8 +193,8 @@ npm run dev   # :3000
 
 Варианты из ТЗ: Vercel vs Beget VPS (latency РФ, 152-ФЗ).
 
-**Минимум перед go-live:**
-- [ ] Гидрация корзины на реальный API (блокер)
+**Минимум перед go-live на `muru.ru`:**
+- [x] Гидрация корзины на реальный API — закрыто 2026-07-02
 - [ ] `NEXT_PUBLIC_API_BASE` → прод API URL
 - [ ] `NEXT_PUBLIC_CATALOG_API_BASE` → тот же API
 - [ ] `NEXT_PUBLIC_API_MOCKING` **выключен**
@@ -261,3 +270,4 @@ flowchart LR
 | 2026-07-02 | Первая версия runbook |
 | 2026-07-02 | `muru-backend-local` remote → отдельный GitHub-репо |
 | 2026-07-02 | Pending deploy — живой статус в PROGRESS.md |
+| 2026-07-04 | DEP-006/007 deployed; staging storefront в карте окружений |

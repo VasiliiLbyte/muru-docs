@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-04 (web catalog F/G/H + channel=web live на staging)
+Последнее обновление: 2026-07-04 (аудит + hardening DEP-006/007)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -52,13 +52,16 @@
 - **E2e staging `web.murushop.ru` — ВЫПОЛНЕН 2026-07-03** (ручной прогон Василия): каталог → корзина → `/checkout/` → CDEK (расчёт OK) → ЮKassa (тестовая карта) → `/checkout/return/` «Заказ оплачен». Env: `YOOKASSA_WEB_RETURN_URL`, `YOOKASSA_WEB_SHOP_ID`, `YOOKASSA_WEB_SECRET_KEY` в `/var/www/muru/backend/.env` (SSH; файловый менеджер Beget не сохранял — права панели).
 - **Web catalog F/G/H — бэкенд + sync на VPS 2026-07-04** (`2026-07-03-06-be/fp`, hotfix subcategory columns, sync ~260). Mini app OK.
 - **Storefront channel=web — LIVE на staging 2026-07-04** (`2026-07-03-06-fe`, `b419a3f` на VPS): cross-категории G/H на `web.murushop.ru` — verify Василия OK.
+- **Аудит 2026-07-04** (read-only): ядро v1 подтверждено (miniAPP vitest 221/221); CRM v0.1 ≈ 15–20%; закрыто: обратный FP-gap CORS (`84cab5e` в local), rate limits, `schema.sql` parity, prod-only `node_modules` на каноне, билд-зависимость `catalog-menu` от живого API; trust proxy уже был (ошибка аудита).
+- **Hardening DEP-006** (`2c97f0e`, VPS 2026-07-04): `restock-notify` 5/min IP, `pickup-points` 30/min IP, `schema.sql` web-identity; `deploy.sh`, без psql; verify: 6-й POST restock → 429.
+- **Storefront build resilience DEP-007** (`05f08bf`, VPS 2026-07-04): `catalog-menu` try/catch + `.env.production*` в gitignore; build 28/28; `/catalog/` + `/legal/offer/` 200.
 
 ## Следующее
 - **Контент/UX staging (по приоритету бизнеса):** картинки плиток категорий, URL PDP (`/catalog/…/…/SKU/`), `collections.ts`.
 - **Go-live `muru.ru`:** DNS, prod ЮKassa web, 301 с Bitrix — когда заказчик готов.
 
 ## Блокеры
-- Нет активных блокеров. Pending deploy: DEP-001..005 закрыты.
+- Нет активных блокеров. Pending deploy: DEP-001..007 закрыты.
 
 ## Ожидает деплоя (Pending deploy)
 
@@ -71,15 +74,20 @@
 | DEP-003 | Web checkout API (`/payments/web/*`, `/cdek/web/calculate`, channel-aware YK) | `MURU_miniAPP` / `master` | verified | **deployed** (Василий, 2026-07-03) | — | Коммит `52b23fd`; `deploy.sh`; smoke mini app OK |
 | DEP-004 | Web catalog F/G/H + hotfix subcategory | `MURU_miniAPP` / `master` | verified | **deployed** (Василий, 2026-07-04) | — | `c2df422` + hotfix; migration 015; sync ~260 |
 | DEP-005 | Storefront `channel=web` cross-listing | `muru-storefront` / `main` | verified | **deployed** (Василий, 2026-07-04) | — | `b419a3f` на `web.murushop.ru` |
+| DEP-006 | Rate limits + `schema.sql` parity | `MURU_miniAPP` / `master` | verified | **deployed** (Василий, 2026-07-04) | — | `2c97f0e`; restock 6-й → 429 |
+| DEP-007 | `catalog-menu` fallback + gitignore | `muru-storefront` / `main` | verified | **deployed** (Василий, 2026-07-04) | — | `05f08bf`; build 28/28 |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
 ## Бэклог (не терять)
-- Деплой на VPS — `DEP-001`..`003` ✅. Следующий ops: storefront staging на `web.murushop.ru`.
 - Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко.
 - Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
 - CDEK debug-урок для памяти: ранний симптом «расчёт цены не приходит» (сессия 2026-07-02) свёлся к пустым CDEK-кредам в `.env` на момент теста — сам расчётный код был исправен с самого начала. Перед глубоким дебагом смотреть `.env` в первую очередь.
+- Rate limiter in-memory per-process — при масштабировании вынести в Redis.
+- `getProducts` витрины тянет весь каталог и фильтрует в Node — ок до ~1000 SKU, дальше серверные query-параметры.
+- Конвенция: `schema.sql` держим синхронным с миграциями в обоих backend-репо.
+- `sitemap.xml` при билде без API — отдельный fallback (follow-up из 2026-07-04-02; `catalog-menu` уже fixed).
 
 ## Крупное расширение скоупа
 Заказчик прислал рецензию ТЗ + Арина 6 пунктов маркетинга (30.06.2026). Это **отдельный оплачиваемый этап, НЕ входит в 470k v1**. Детали и триаж — в `SPEC.md` → блок v0.2.
@@ -95,3 +103,4 @@
 - **2026-07-03 (сессия 2)**: Промпт `2026-07-03-05` — `variant=listing` при flat tree; `cf2084d` на VPS. Verify: флористика 25 карточек. Следующий шаг — e2e оплаты на staging.
 - **2026-07-03 (сессия 3)**: E2e staging закрыт — CDEK + ЮKassa web env через SSH; «Заказ оплачен» на `web.murushop.ru`. Beget file manager — не использовать для `/var/www/.../.env`.
 - **2026-07-04**: Web catalog F/G/H (`2026-07-03-06-be/fp/fe`). Hotfix `products.subcategory` на VPS. Sync 260. Mini app + web cross-listing OK. DEP-004/005 ✅. Фаза staging v1 закрыта.
+- **2026-07-04 (сессия 2)**: Полный аудит Claude; ремедиация промпты `2026-07-04-01/-01-fp/-02`; коммиты `84cab5e`/`2c97f0e`/`05f08bf`; VPS deploy + verify (restock 429, build 28/28, browser + mini app OK). DEP-006/007 ✅. muru-docs sync (`2026-07-04-03`).
