@@ -81,11 +81,11 @@
 | `imageUrls[]` | `images[].url` |
 | `category`, `subcategorySlug` | `categorySlugs[]` |
 
-### Известный разрыв (блокер cutover)
+### Гидрация корзины по SKU (закрыто 2026-07-02)
 
-| Storefront (MSW-only) | Backend | Статус |
+| Storefront | Backend | Статус |
 |---|---|---|
-| `GET /products/by-sku/:sku` | `GET /api/catalog/products/:sku` | **Исправить:** `getProductBySku()` → `fetchCatalogProductBySku` при включённом каталог-бэке |
+| `getProductBySku()` → `fetchCatalogProductBySku(sku)` | `GET /api/catalog/products/:sku` | ✅ При `NEXT_PUBLIC_API_BASE` (или `NEXT_PUBLIC_CATALOG_API_BASE`) каталог-бэкенд включён; SKU нормализуется `trim().toUpperCase()`. MSW `GET /products/by-sku/:sku` — только dev-fallback без API_BASE. |
 
 Контент (collections, lookbooks, static pages) — **не API**, статика в `muru-storefront/src/lib/content/`.
 
@@ -253,3 +253,4 @@ NEXT_PUBLIC_CATALOG_API_BASE=http://localhost:4000/api
 |---|---|
 | 2026-07-02 | Первая версия: catalog, web payments, CDEK web, envelope, env matrix |
 | 2026-07-02 | Зафиксирован блокер `getProductBySku` vs `/catalog/products/:sku` |
+| 2026-07-02 | Блокер закрыт: fallback `CATALOG_API_BASE` ← `API_BASE`, uppercase SKU, `getProductBySku` → catalog fetch |

@@ -3,7 +3,7 @@
 Синхронизация кода между **каноническим бэкендом** (`muru-backend-local`) и **прод-монорепо** (`MURU_miniAPP`).
 
 **Версия:** 2026-07-02  
-**Связанные документы:** [`ORCHESTRATOR.md`](ORCHESTRATOR.md), [`PROGRESS.md`](PROGRESS.md) (Pending deploy), [`DEPLOY.md`](DEPLOY.md)
+**Связанные документы:** `[ORCHESTRATOR.md](ORCHESTRATOR.md)`, `[PROGRESS.md](PROGRESS.md)` (Pending deploy), `[DEPLOY.md](DEPLOY.md)`
 
 ---
 
@@ -11,10 +11,12 @@
 
 Сейчас два репозитория с общей историей, но разными ветками:
 
-| Репо | Ветка | Роль |
-|---|---|---|
+
+| Репо                 | Ветка                    | Роль                                  |
+| -------------------- | ------------------------ | ------------------------------------- |
 | `muru-backend-local` | `storefront-integration` | Канон: новые API, web-канал, CRM-ядро |
-| `MURU_miniAPP` | `master` | Прод на Beget VPS (`murushop.ru`) |
+| `MURU_miniAPP`       | `master`                 | Прод на Beget VPS (`murushop.ru`)     |
+
 
 Без протокола легко: пофиксить в одном репо и забыть зеркалировать в другом, или задеплоить на VPS то, чего нет в `MURU_miniAPP`.
 
@@ -22,12 +24,14 @@
 
 ## 2. Когда нужен Forward-Port
 
-| Ситуация | Направление |
-|---|---|
-| Новая фича / фикс разработан в `muru-backend-local` и должна попасть в прод Mini App | **local → miniAPP** |
-| Срочный хотфикс сделан напрямую в `MURU_miniAPP` на VPS | **miniAPP → local** (сразу после коммита) |
-| Изменения затрагивают `backend/` **и** `frontend/` mini app | Forward-port **обоих** слоёв |
-| Есть SQL-миграция для прод-БД | Forward-port код + запись в Pending deploy + `DEPLOY.md` |
+
+| Ситуация                                                                             | Направление                                              |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| Новая фича / фикс разработан в `muru-backend-local` и должна попасть в прод Mini App | **local → miniAPP**                                      |
+| Срочный хотфикс сделан напрямую в `MURU_miniAPP` на VPS                              | **miniAPP → local** (сразу после коммита)                |
+| Изменения затрагивают `backend/` **и** `frontend/` mini app                          | Forward-port **обоих** слоёв                             |
+| Есть SQL-миграция для прод-БД                                                        | Forward-port код + запись в Pending deploy + `DEPLOY.md` |
+
 
 ## 3. Когда НЕ нужен
 
@@ -47,6 +51,8 @@ flowchart LR
   B -->|git push| C[VPS deploy]
   C --> D[PROGRESS Pending deploy]
 ```
+
+
 
 1. Фича verified в `muru-backend-local` (`tsc`, vitest, ручной сценарий).
 2. Оркестратор выдаёт forward-port промпт (шаблон §7).
@@ -98,12 +104,14 @@ diff "/Users/vasilii/Desktop/code /muru-backend-local/backend/src/..." \
 
 ### Типичные ловушки
 
-| Ловушка | Как избежать |
-|---|---|
-| Скопировали web-only код в miniAPP до cutover | Forward-port только то, что нужно **телеграм-проду сейчас** |
-| Забыли frontend mini app при backend-изменении | Проверить `frontend/src/` в обоих монорепо |
-| Разные пути импорта после рефактора | Сверять по смыслу, не построчно вслепую |
-| Миграция применена только на local БД | Pending deploy + `psql` на VPS перед деплоем кода |
+
+| Ловушка                                        | Как избежать                                                |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| Скопировали web-only код в miniAPP до cutover  | Forward-port только то, что нужно **телеграм-проду сейчас** |
+| Забыли frontend mini app при backend-изменении | Проверить `frontend/src/` в обоих монорепо                  |
+| Разные пути импорта после рефактора            | Сверять по смыслу, не построчно вслепую                     |
+| Миграция применена только на local БД          | Pending deploy + `psql` на VPS перед деплоем кода           |
+
 
 ---
 
@@ -158,12 +166,15 @@ diff "/Users/vasilii/Desktop/code /muru-backend-local/backend/src/..." \
 
 **Задача:** убрать небезопасный эндпоинт, принимавший клиентские цены.
 
-| | muru-backend-local | MURU_miniAPP |
-|---|---|---|
-| Статус кода | ✅ verified | ✅ verified |
-| VPS | — | ⏳ Pending deploy (`DEP-001`) |
+
+|             | muru-backend-local | MURU_miniAPP                 |
+| ----------- | ------------------ | ---------------------------- |
+| Статус кода | ✅ verified         | ✅ verified                   |
+| VPS         | —                  | ⏳ Pending deploy (`DEP-001`) |
+
 
 **Изменения:**
+
 - Backend: удалены роут и `createOrderHandler`
 - Frontend: удалены мёртвые `createOrder`, `submitOrder` в CartContext
 - **Не тронуты:** `draftPayloadSchema`, сервисный `createOrder` (нужны для draft/fulfill)
@@ -183,6 +194,9 @@ diff "/Users/vasilii/Desktop/code /muru-backend-local/backend/src/..." \
 
 ## Changelog
 
-| Дата | Изменение |
-|---|---|
+
+| Дата       | Изменение               |
+| ---------- | ----------------------- |
 | 2026-07-02 | Первая версия протокола |
+
+
