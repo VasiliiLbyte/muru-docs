@@ -16,24 +16,26 @@ Cursor rule: [`.cursor/rules/60-orchestrator.mdc`](.cursor/rules/60-orchestrator
 
 ---
 
-## 2. Карта репозиториев
+## 2. Карта репозиториев (после cutover 2026-07-06)
 
 ```
 /Users/vasilii/Desktop/code /
 ├── muru-docs/              ← память, ТЗ, этот playbook
-├── muru-backend-local/     ← канонический бэкенд (storefront-integration, :4000)
-├── MURU_miniAPP/           ← прод (Beget, murushop.ru)
+├── muru-backend-local/     ← единственный канон бэкенда = прод (murushop.ru), :4000 локально
+├── MURU_miniAPP/           ← ЗАМОРОЖЕН, не деплоится, история сохранена
 └── muru-storefront/        ← витрина Next.js (будущий muru.ru)
 ```
 
 | Репо | Git | Когда трогать |
 |---|---|---|
-| `muru-backend-local` | `VasiliiLbyte/muru-backend-local`, ветка `storefront-integration` | Новые API, миграции, web-канал, CRM-ядро |
-| `MURU_miniAPP` | `VasiliiLbyte/MURU_miniAPP`, `master` | Прод на Beget; хотфиксы — forward-port в local |
+| `muru-backend-local` | `VasiliiLbyte/muru-backend-local`, ветка `master` | Новые API, миграции, web-канал, CRM-ядро — **и это же деплоится на прод** `/var/www/muru`. Дефолтная ветка на GitHub — `main` (устаревшая!), всегда клонировать `-b master` |
+| ~~`MURU_miniAPP`~~ | `VasiliiLbyte/MURU_miniAPP`, `master` | Заморожен с 2026-07-06 (см. `PROGRESS.md` U4-post). Не трогать, не деплоить |
 | `muru-storefront` | `VasiliiLbyte/muru-storefront` | UI витрины, SEO, чекаут |
 | `muru-docs` | `VasiliiLbyte/muru-docs` | После каждой проверенной сессии |
 
-**Порядок при зависимостях:** бэкенд (`muru-backend-local`) → витрина (`muru-storefront`) → прод (`MURU_miniAPP`).
+**Порядок при зависимостях:** бэкенд (`muru-backend-local`) → витрина (`muru-storefront`) → прод (тот же `muru-backend-local`, деплой на `/var/www/muru`).
+
+**Модель ветвления канона:** `master` = прод (то, что реально стоит на VPS). Рискованные/крупные изменения — сначала обкатать на staging (`api-staging.murushop.ru`, `DEPLOY.md` §2a) на отдельной feature-ветке или прямо на `master` перед деплоем на прод, в зависимости от риска. Форвард-порт между репозиториями (`FORWARD_PORT.md`) — deprecated, больше не нужен (один репозиторий).
 
 ---
 
@@ -213,9 +215,9 @@ Auto **не заменит** архитектурные решения по CRM 
 
 ---
 
-## 9. Текущий фокус (из PROGRESS на 2026-07-04)
+## 9. Текущий фокус (из PROGRESS на 2026-07-06)
 
-**Фаза staging v1 закрыта (2026-07-04).** Hardening по аудиту — deployed (DEP-006/007).
+**Унификация бэкендов (U1-U4) завершена 2026-07-06.** Прод `/var/www/muru` деплоится напрямую из `muru-backend-local`. `MURU_miniAPP` заморожен (U4-post).
 
 **Фокус:**
 1. Контент/UX staging — плитки категорий, URL PDP, `collections.ts`

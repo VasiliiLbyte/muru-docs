@@ -2,7 +2,7 @@
 
 Операционный чеклист деплоя. Детали API — в [`API_CONTRACT.md`](API_CONTRACT.md). Статус работ — в [`PROGRESS.md`](PROGRESS.md).
 
-**Версия:** 2026-07-04
+**Версия:** 2026-07-06 (после cutover прода на канон, см. `PROGRESS.md` → «Унификация бэкендов» U1-U4)
 
 ---
 
@@ -10,8 +10,9 @@
 
 | Компонент | Репозиторий | GitHub | Где крутится |
 |---|---|---|---|
-| Mini App + API (прод) | `MURU_miniAPP` | `VasiliiLbyte/MURU_miniAPP` | Beget VPS `/var/www/muru` |
-| Канонический бэкенд (dev) | `muru-backend-local` | `VasiliiLbyte/muru-backend-local` | Локально `:4000`, ветка `storefront-integration` |
+| Mini App + API (прод) | **`muru-backend-local`** (канон) | `VasiliiLbyte/muru-backend-local`, ветка `master` | Beget VPS `/var/www/muru`, PM2 `muru-backend` (:4000) |
+| Staging backend (тест перед прод-изменениями) | `muru-backend-local`, ветка `master` (или feature-ветка) | тот же репозиторий | Beget VPS `/var/www/muru-staging`, PM2 `muru-backend-staging` (:4001), домен `api-staging.murushop.ru` |
+| ~~MURU_miniAPP~~ | Заморожен с 2026-07-06 | `VasiliiLbyte/MURU_miniAPP` | Не деплоится, история сохранена для референса |
 | Витрина (staging → будущий muru.ru) | `muru-storefront` | `VasiliiLbyte/muru-storefront` | Beget VPS `/var/www/muru-storefront`, PM2 `muru-storefront`; локально `:3000` |
 | Документация / оркестратор | `muru-docs` | `VasiliiLbyte/muru-docs` | Git only |
 
@@ -19,8 +20,9 @@
 
 | Домен | Назначение |
 |---|---|
-| `murushop.ru` | Mini App + API (canonical) |
-| `murushop.online` | Редирект / YooKassa test webhook |
+| `murushop.ru` | Mini App + API (canonical), включая `/yookassa-webhook` |
+| `murushop.online` | Легаси-домен — **301 редирект на `murushop.ru`** для всех путей (см. `deploy/nginx-murushop.online.conf`). ЮKassa webhook настроен на `murushop.ru`, не `.online` |
+| `api-staging.murushop.ru` | Staging backend (порт 4001), только API, без frontend mini app |
 | `web.murushop.ru` | Staging витрина (Next.js, `muru-storefront`) |
 | `muru.ru` | Bitrix (выводится) → заменит `muru-storefront` |
 
@@ -38,10 +40,12 @@
 ### Чеклист перед деплоем
 
 - [ ] Изменения протестированы локально (`tsc`, vitest, ручной e2e)
-- [ ] Форвард-порт из `muru-backend-local` → `MURU_miniAPP` выполнен (если фича новая)
+- [ ] Для рискованных изменений — обкатано на staging (`api-staging.murushop.ru`, см. §2a) перед прод-деплоем
 - [ ] Миграции БД подготовлены (см. §4)
 - [ ] `.env` на VPS обновлён (новые ключи)
 - [ ] Nginx конфиг актуален (`deploy/nginx-murushop.ru.conf`)
+
+> С 2026-07-06 (cutover, `PROGRESS.md` DEP-008) прод `/var/www/muru` деплоится **напрямую из канона** `muru-backend-local` (`origin` на VPS переключён). Форвард-порт в `MURU_miniAPP` (заморожен) больше не нужен — см. `FORWARD_PORT.md` (deprecated).
 
 ### Команды деплоя
 
@@ -84,8 +88,10 @@ pm2 status
 pm2 logs --lines 100
 curl -sS http://127.0.0.1:4000/api/health
 curl -sS -o /dev/null -w "%{http_code}" https://murushop.ru/catalog
-curl -X POST https://murushop.online/yookassa-webhook   # ожидается 200, не 405
+curl -X POST https://murushop.ru/yookassa-webhook   # curl с не-ЮKassa IP → 404 (ожидаемо, см. ниже), НЕ 500/405
 ```
+
+> **Про `/yookassa-webhook` и 404:** при `YOOKASSA_VERIFY_IP=true` (прод-default) `yookassaIpGuard` сознательно отдаёт пустой `404` (не 403) любому IP вне официального allowlist ЮKassa — это защита, а не баг. `curl` с произвольного IP (в т.ч. с самого VPS через `localhost:4000`) получит 404 — это ожидаемо и подтверждает, что guard работает. Значимая проверка вебхука — только через реальный платёж или временный `YOOKASSA_VERIFY_IP=false` на **staging** (не на проде). `murushop.online/yookassa-webhook` всегда отдаёт `301` на `murushop.ru` (легаси-домен, см. §1) — это не ошибка.
 
 **Ручной smoke:**
 - Mini App открывается из Telegram
@@ -98,6 +104,57 @@ curl -X POST https://murushop.online/yookassa-webhook   # ожидается 200
 ```bash
 mkdir -p /var/www/muru/cache/img
 # IMAGE_CACHE_DIR=/var/www/muru/cache/img в .env
+```
+
+---
+
+## 2a. VPS: Staging backend (для рискованных изменений)
+
+**URL:** `https://api-staging.murushop.ru` (API only, без frontend mini app)
+**Путь на VPS:** `/var/www/muru-staging`
+**PM2:** `muru-backend-staging`, порт **4001**, отдельный процесс от прод `muru-backend`
+
+### Жёсткие правила (не нарушать)
+- `TELEGRAM_BOT_TOKEN` в staging `.env` — **всегда пусто**. Два поллера на один токен = `409 Conflict` и падение прод-бота.
+- Деплой ТОЛЬКО через `bash deploy-staging.sh` (никогда `pm2 reload ecosystem.config.js` — это имя прод-процесса).
+- ЮKassa webhook остаётся направлен на прод; на staging платёжные статусы — только поллингом.
+- При `NODE_ENV=production` (staging использует его для реалистичности) обязательны непустые `YOOKASSA_SHOP_ID`/`YOOKASSA_SECRET_KEY`/`YOOKASSA_RETURN_URL` — иначе `env.ts` завершает процесс на старте (`process.exit(1)`, лог может не успеть сброситься — выглядит как «тихий краш»). Достаточно любых непустых значений, реальный вызов ЮKassa на staging не требуется для базового смоука.
+- CDEK-эндпоинты без реальных `CDEK_CLIENT_ID/SECRET` вернут `500` — это ожидаемо (не guard на старте, падает в рантайме), не блокирует остальной смоук.
+
+### Первичный сетап (одноразово)
+```bash
+sudo -u postgres createdb -O muru_user muru_staging
+sudo -u postgres psql -d muru_staging -c "ALTER SCHEMA public OWNER TO muru_user;"  # PG15+: обязательно, иначе permission denied при restore
+PGPASSWORD='<пароль>' pg_dump -h localhost -U muru_user -d muru_db | PGPASSWORD='<пароль>' psql -h localhost -U muru_user -d muru_staging
+
+cd /var/www
+git clone -b master https://github.com/VasiliiLbyte/muru-backend-local.git muru-staging   # ВАЖНО: -b master — дефолтная ветка на GitHub сейчас main (устаревшая)
+cd muru-staging
+cp .env.staging.example .env
+# отредактировать: PORT=4001, DATABASE_URL → muru_staging, TELEGRAM_BOT_TOKEN пусто, JWT_SECRET новый, YOOKASSA_* непустые плейсхолдеры (см. выше)
+bash deploy-staging.sh
+```
+
+Nginx (одноразово, домен нужно предварительно завести A-записью в DNS):
+```bash
+sudo cp deploy/nginx-api-staging.conf /etc/nginx/sites-available/api-staging.murushop.ru
+sudo ln -sf /etc/nginx/sites-available/api-staging.murushop.ru /etc/nginx/sites-enabled/
+sudo certbot --nginx -d api-staging.murushop.ru
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Обновление staging (после первичного сетапа)
+```bash
+cd /var/www/muru-staging
+git pull origin master   # или нужная feature-ветка
+bash deploy-staging.sh
+pm2 status   # muru-backend (прод) restart-counter НЕ должен меняться
+```
+
+### Проверка
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" https://api-staging.murushop.ru/api/health
+pm2 status   # muru-backend-staging online; muru-backend (прод) без изменений
 ```
 
 ---
@@ -120,8 +177,9 @@ mkdir -p /var/www/muru/cache/img
 # Базовая схема (идемпотентно)
 psql "$DATABASE_URL" -f backend/src/db/schema.sql
 
-# По порядку 001–014 (если ещё не применены)
+# По порядку 001–015 (если ещё не применены)
 psql "$DATABASE_URL" -f backend/src/db/migrations/014_web_identity.sql
+psql "$DATABASE_URL" -f backend/src/db/migrations/015_web_catalog_placements.sql
 ```
 
 **014 — web-канал:**
@@ -209,17 +267,17 @@ npm run dev   # :3000
 
 | Окружение | URL |
 |---|---|
-| Тест | `https://murushop.online/yookassa-webhook` |
-| Прод | тот же endpoint (nginx на `.online` и `.ru`) |
+| Прод | `https://murushop.ru/yookassa-webhook` |
+| ~~`murushop.online/yookassa-webhook`~~ | Устарело — `.online` теперь **301 на `.ru`** целиком (легаси-домен, см. §1). В личном кабинете ЮKassa должен быть указан `murushop.ru`, не `.online` |
 
-События: `payment.succeeded`, `payment.canceled`  
+События: `payment.succeeded`, `payment.canceled`
 При втором магазине (web) — тот же webhook URL в личном кабинете ЮKassa.
 
-Проверка: `curl -X POST https://murushop.online/yookassa-webhook` → **200**
+**Проверка через `curl` с произвольного IP → `404`, это ожидаемо** (см. §2a про `yookassaIpGuard` + `YOOKASSA_VERIFY_IP=true`). `500`/`405`/зависание — реальная проблема, `404` от VPS/локального curl — нет. Полноценная проверка — только реальным платежом (ЮKassa шлёт вебхук со своих официальных IP) или временным `YOOKASSA_VERIFY_IP=false` на staging.
 
 ---
 
-## 8. Strangler: порядок cutover
+## 8. Strangler: порядок cutover (✅ завершён 2026-07-06)
 
 ```mermaid
 flowchart LR
@@ -227,14 +285,13 @@ flowchart LR
   B --> C[e2e web checkout OK]
   C --> D[Миграция 014 на VPS]
   D --> E[Деплой web API на VPS]
-  E --> F[Storefront go-live muru.ru]
-  F --> G[Mini App на общий бэкенд]
+  E --> F[Storefront go-live web.murushop.ru]
+  F --> G[Mini App на общий бэкенд ✅]
 ```
 
-Не деплоить web-канал на прод до:
-1. Гидрации корзины
-2. E2E на staging/preview
-3. Миграции 014
+Последний шаг (G) выполнен: `/var/www/muru` теперь деплоится напрямую из `muru-backend-local` (`master`), `MURU_miniAPP` заморожен. Детали — `PROGRESS.md` → «Унификация бэкендов» U1-U4, `DEP-008`.
+
+**Отдельно от strangler (2026-07-06): унификация двух репозиториев backend'а** (`muru-backend-local` ↔ `MURU_miniAPP`) в единый канон — см. `PROGRESS.md` разделы U1 (аудит дрейфа) → U4 (cutover). Не путать с strangler-паттерном выше (тот про API для storefront, этот — про сам репозиторий).
 
 ---
 
@@ -249,6 +306,10 @@ flowchart LR
 | CORS blocked | Добавить origin в `ALLOWED_ORIGINS` |
 | Sync timeout в админке | nginx `proxy_read_timeout 300s` для `/api/` |
 | Webhook 405 | `sudo bash deploy/sync-nginx-murushop.sh` |
+| Webhook 404 через curl | Ожидаемо — `yookassaIpGuard` блокирует не-ЮKassa IP, см. §7. Не чинить |
+| Staging-процесс «тихо» падает сразу после старта (`errored`, лог только dotenv-tips) | При `NODE_ENV=production` проверить непустые `YOOKASSA_SHOP_ID/SECRET_KEY/RETURN_URL` в `.env` — `env.ts` делает `process.exit(1)` без гарантированного флаша лога |
+| `git clone` даёт старый код без ожидаемых файлов | Проверить дефолтную ветку на GitHub (`git ls-remote --symref <url> HEAD`) — у `muru-backend-local` дефолт `main` (устаревший), канон — `master`. Всегда клонировать `-b master` |
+| `pg_dump \| psql` в новую БД → `permission denied for schema public` | PG15+: `ALTER SCHEMA public OWNER TO <user>;` перед restore — владелец БД не наследует владение автосозданной схемой |
 
 ---
 
@@ -269,5 +330,6 @@ flowchart LR
 |---|---|
 | 2026-07-02 | Первая версия runbook |
 | 2026-07-02 | `muru-backend-local` remote → отдельный GitHub-репо |
+| 2026-07-06 | Cutover прода на канон (`DEP-008`): карта окружений, §2a staging backend, YooKassa webhook §7 (домен `.ru`, IP-guard 404), частые проблемы дополнены находками U3/U4 |
 | 2026-07-02 | Pending deploy — живой статус в PROGRESS.md |
 | 2026-07-04 | DEP-006/007 deployed; staging storefront в карте окружений |
