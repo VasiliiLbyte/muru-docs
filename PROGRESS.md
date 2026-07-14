@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-14 (DEP-017 deployed @ 1392cb7, mini app invoice OK)
+Последнее обновление: 2026-07-14 (CUTOVER выполнен, `CATALOG_SOURCE=crm`, DEP-018)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -46,7 +46,7 @@
 
 - **Forward-port миграции 014 в MURU_miniAPP — ВЫПОЛНЕН и ПРИМЕНЁН на VPS 2026-07-03** (промпт `2026-07-03-01`, коммит `0fcdf41`): `backend/src/db/migrations/014_web_identity.sql` идентичен `muru-backend-local`; README обновлён; VPS `git pull` + `psql -f` — успешно.
 - **Storefront: cutover корзины на GitHub 2026-07-03** — `muru-storefront` / `main` коммит `3a03a61` (`catalog-backend.ts`, `.env.example`, `add-to-cart-button.tsx`).
-- **Cutover prep + invoice hotfix — DEP-017 DEPLOYED 2026-07-14:** prod `/var/www/muru` @ `1392cb7`. Cutover prep (`da280b2`: env log, maintenance, sync 423) + invoice URL chain (`a98222e` accept `telegram.me`, `1392cb7` normalize → `t.me` for `openInvoice`). Prod smoke Василия: mini app checkout → оплата OK. Миграций нет.
+- **Cutover Sheets → CRM — ВЫПОЛНЕН 2026-07-14 (DEP-018):** prod `CATALOG_SOURCE=crm`; sync #54 (264 SKU); backup 177K; смоук invoice/витрина/CRM write/archive/`/img/` OK.
 - **Web checkout API на VPS — ВЫПОЛНЕН и ЗАДЕПЛОЕН 2026-07-03** (`DEP-003`, промпт `2026-07-03-02-fp`, коммит `52b23fd`): forward-port web API в `MURU_miniAPP`; VPS `git pull` + `deploy.sh`; curl prod: `/api/cdek/web/calculate` и `/api/payments/web/create` → 400 (роуты живы, не 404); smoke mini app Василия — OK.
 
 - **Staging `web.murushop.ru` — LIVE 2026-07-03:** deploy `8f5bb15`→`6a5564a`, PM2+nginx+certbot, `curl /catalog/` → 200; fix `force-dynamic` (`2026-07-03-04`). Mini app smoke OK.
@@ -81,11 +81,19 @@
   - **ИТОГ ФАЗЫ: унификация бэкендов U1-U4 полностью завершена и верифицирована за одну сессию 2026-07-06.** Единый канон `muru-backend-local/master` = прод (`/var/www/muru`, деплой напрямую). `MURU_miniAPP` заморожен. Форвард-порт больше не нужен. Точка отката на прод: `origin` = `MURU_miniAPP.git`, SHA `2c97f0e`.
 
 ## Следующее
-- **Cutover окно:** операции по `CUTOVER.md` (консолидация `/var/www/muru/.env`, опционально `MINIAPP_MAINTENANCE`, флип `CATALOG_SOURCE=crm`).
+- **Боевая валидация** (§4 `CUTOVER.md`): ~30 товаров через CRM; freeze Sheets с клиентом (п.6).
+- **Hotfix follow-up:** admin `ProductEditPage` create (`isNew = !id || id === 'new'`); storefront `/img/` для CRM-фото; category `coverImageUrl` в `adaptTree`.
+- **Операционно:** пре-чеклист п.8 (`backend/.env` → `.unused`); подтвердить п.8 смоука (TG sync 423).
+
+## Cutover (операционный, 2026-07-14) — ВЫПОЛНЕН
+
+**Prod @ `1392cb7`:** `CATALOG_SOURCE=crm`, `ENABLE_SHEETS_STOCK_WRITE=false`. Финальный sync #54: 264 SKU. Бэкап `muru_db_pre_cutover_2026-07-14_0843.dump` (177K). Смоук: invoice, витрина, CRM write, `/img/crm_*` 200, архив/разархив OK. Откат доступен 48 ч (§5 `CUTOVER.md`).
+
+**Follow-up (не блокируют cutover):** create product UI bug; storefront CRM images; category tile images on web.
 
 ## Cutover prep (код + prod, 2026-07-14)
 
-**Prod @ `1392cb7` (DEP-017 deployed):** `[env] loaded`, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice: accept `telegram.me/$` + normalize → `t.me/$` для `openInvoice`. Ранбук cutover — `CUTOVER.md`.
+**Prod @ `1392cb7` (DEP-017 deployed):** `[env] loaded`, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice: accept `telegram.me/$` + normalize → `t.me/$` для `openInvoice`. **Staging @ `1392cb7` (TD-002 closed 2026-07-14):** `reset --hard origin/master` + `deploy-staging.sh`; health 200, db connected; prod `muru-backend` не тронут (↺131). Ранбук cutover — `CUTOVER.md`.
 
 ## Фаза: Админка A (фундамент — auth, роли, каркас)
 
@@ -257,7 +265,7 @@
 | **D8** | Migration 019 subcategory + nginx `/img/` | **DEPLOYED** (`master` @ `0877d6d`, DEP-016) |
 | **D8.1** | TD-005: mock env in sync-scheduler.test.ts | **MERGED** (`master` @ `1e439bf`, push OK; deploy не нужен) |
 
-- **ИТОГ ФАЗЫ: «Админка D: CRM Каталог» (D1–D8.1) полностью завершена и верифицирована 2026-07-14.** Live: `https://murushop.ru/admin/catalog`, API `/api/crm/catalog/*`, nginx `/img/`, migration 018/019 на прод-БД. Прод в режиме `CATALOG_SOURCE=sheets` (CRM read-only, sync из Google Sheets). Полный cutover на `crm` — операционный шаг вне фазы, ранбук `CUTOVER.md`. Откат кода: `git reset --hard f256a39` + `deploy.sh` (миграции 018/019 аддитивны).
+- **ИТОГ ФАЗЫ: «Админка D: CRM Каталог» (D1–D8.1) полностью завершена и верифицирована 2026-07-14.** Live: `https://murushop.ru/admin/catalog`, API `/api/crm/catalog/*`, nginx `/img/`, migration 018/019 на прод-БД. **Cutover 2026-07-14:** прод `CATALOG_SOURCE=crm` (DEP-018). Откат кода: `git reset --hard f256a39` + `deploy.sh` (миграции 018/019 аддитивны); откат режима: §5 `CUTOVER.md`.
 
 ### Env-заметка (D1)
 Сейчас в коде `CATALOG_SOURCE` = `'xlsx'|'sheets'|'crm'` в Zod; верхний уровень владения — `'sheets'|'crm'`. Legacy `xlsx` → `catalogSource='sheets'` + `googleCatalogReadMode='xlsx'`. Экспорт: `catalogSource`, `googleCatalogReadMode`, `isCatalogCrmMode`. **D1 verified:** guards, CRUD, публичный фильтр `is_archived`, 54/275 тестов.
@@ -311,12 +319,14 @@
 | DEP-014 | D7: CRM categories web tree + safe delete | `muru-backend-local` / `master` (`8fa0f38`) | verified | **deployed** (Василий, 2026-07-13) | FF `e5cc51c→8fa0f38`; `deploy.sh`; без миграции | браузерный смоук categories — по желанию |
 | DEP-015 | D7.1: DISTINCT directProductCount hotfix | `muru-backend-local` / `master` (`2d20658`) | verified | **deployed** (Василий, 2026-07-13) | FF `8fa0f38→2d20658`; smoke cat#821: 49/1/2 | — |
 | DEP-016 | D8: migration 019 + nginx `/img/` | `muru-backend-local` / `master` (`0877d6d`) | verified | **deployed** (Василий, 2026-07-13) | psql 019 (NOTICE skip OK); `sync-nginx-murushop.sh`; `/img/` → 200 | TD-001, TD-004 closed |
-| DEP-017 | Cutover prep + invoice hotfix: env log, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice `telegram.me`→`t.me` | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | `git pull` + `deploy.sh`; без миграции | Prod smoke: mini app invoice OK; cutover — `CUTOVER.md` |
+| DEP-017 | Cutover prep + invoice hotfix: env log, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice `telegram.me`→`t.me` | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | `git pull` + `deploy.sh`; без миграции | Prod smoke: mini app invoice OK |
+| DEP-018 | **Cutover:** `CATALOG_SOURCE=crm`, final sync 264, backup, smoke | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | env flip + `pm2 reload`; backup `/root/backups/muru_db_pre_cutover_2026-07-14_0843.dump` | Смоук §3; follow-up: admin create, storefront CRM images |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
 ## Бэклог (не терять)
-- Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко.
+- Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко. **+ cutover 2026-07-14:** топ-категории на `web.murushop.ru` — `adaptTree()` не мапит `coverImageUrl`; CRM-фото товаров на витрине — нужен `/img/` proxy как в mini app.
+- **Admin create product:** route `products/new` → `useParams().id` undefined; fix `isNew = !id || id === 'new'` (`ProductEditPage.tsx`).
 - ~~Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).~~ ✅ ЗАКРЫТО 2026-07-06 (унификация U1-U4, `MURU_miniAPP` заморожен `7877be1`, прод на каноне DEP-008).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
 - CDEK debug-урок для памяти: ранний симптом «расчёт цены не приходит» (сессия 2026-07-02) свёлся к пустым CDEK-кредам в `.env` на момент теста — сам расчётный код был исправен с самого начала. Перед глубоким дебагом смотреть `.env` в первую очередь.
@@ -329,6 +339,9 @@
 Заказчик прислал рецензию ТЗ + Арина 6 пунктов маркетинга (30.06.2026). Это **отдельный оплачиваемый этап, НЕ входит в 470k v1**. Детали и триаж — в `SPEC.md` → блок v0.2.
 
 ## Лог сессий
+- **2026-07-14 (сессия 8)**: **CUTOVER ВЫПОЛНЕН (DEP-018).** Финальный sync #54 (264 SKU); backup 177K; `CATALOG_SOURCE=crm` + reload; смоук: invoice ✅, витрина ✅, CRM edit ✅, `/img/crm_*` 200, archive/unarchive ✅. Follow-up: admin create bug, storefront CRM images. П.8 TG sync 423 — pending confirm.
+- **2026-07-14 (сессия 7)**: **TD-003 closed.** `/var/www/muru/.env`: `CDEK_SENDER_ADDRESS` в двойных кавычках; `source .env` + `echo` — адрес со скобками без literal `"`; `pm2 reload ecosystem.config.js --update-env` OK.
+- **2026-07-14 (сессия 6)**: **TD-002 closed.** Staging `/var/www/muru-staging` `1e439bf` → `1392cb7` (`reset --hard origin/master`, `deploy-staging.sh`); backend+admin build OK; `api-staging.murushop.ru/api/health` 200 db connected; prod PM2 ↺131 без изменений. Оркестратор: независимый curl health 200.
 - **2026-07-01**: шаг 3 (3a/3b/3c) выполнен и проверен. Заведены muru-docs, PROGRESS.md, SPEC.md. Получены рецензия заказчика и 6 пунктов Арины → зафиксированы в SPEC v0.2 как pending.
 - **2026-07-01 (сессия 2)**: шаг 4 закрыт по фронту. Бэкенд оказался уже полностью CDEK-ready — изменений не потребовалось. Фронт: Leaflet PvzMap, CDEK в `checkout-view`, `/checkout/return`, уборка заглушки. Оба репо tsc-чисты. Дальше — 4c-be (раздельные Shop ID) в новом чате.
 - **2026-07-02**: 4c-be выполнен (channel — обязательный параметр YK-клиента, pre-SELECT в fulfill, 32/32 теста). Бонусом: in_stock-чек в pricing (+2 теста), форвард-порт удаления orders/create в прод-репо (бэк+фронт, tsc чист, деплой за Василием). Разобраны env-проблемы e2e: пустые CDEK_*/DADATA_* в backend/.env, отсутствовавшие YOOKASSA_WEB_RETURN_URL и NEXT_PUBLIC_API_BASE (витрина сидела на MSW). Ручной прогон: города и ПВЗ работают, расчёт стоимости доставки — НЕТ → блокер, дебаг в новом чате.
