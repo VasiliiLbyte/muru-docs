@@ -82,7 +82,7 @@
 
 ## Следующее
 - **Боевая валидация** (§4 `CUTOVER.md`): ~30 товаров через CRM; freeze Sheets с клиентом (п.6).
-- **Hotfix follow-up:** ~~admin create~~ ✅ DEP-019; ~~maintenance vs web~~ ✅ DEP-019; ~~storefront `/img/`~~ ✅ DEP-020; **admin re-edit photo preview** (O-5) — баг; **category covers on web** — проверить hard refresh `/catalog/`.
+- **Hotfix follow-up:** ~~O-1..O-5~~ ✅ DEP-019/020/021 deployed. Open: `MINIAPP_MAINTENANCE=false`, cutover §3.8 TG sync 423.
 - **Операционно:** пре-чеклист п.8 (`backend/.env` → `.unused`); подтвердить п.8 смоука (TG sync 423).
 
 ## Cutover (операционный, 2026-07-14) — ВЫПОЛНЕН
@@ -322,7 +322,8 @@
 | DEP-017 | Cutover prep + invoice hotfix: env log, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice `telegram.me`→`t.me` | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | `git pull` + `deploy.sh`; без миграции | Prod smoke: mini app invoice OK |
 | DEP-018 | **Cutover:** `CATALOG_SOURCE=crm`, final sync 264, backup, smoke | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | env flip + `pm2 reload`; backup `/root/backups/muru_db_pre_cutover_2026-07-14_0843.dump` | Смоук §3; follow-up hotfix → DEP-019 |
 | DEP-019 | Hotfix O-1+O-3: maintenance unless no initData (web OK); admin create product | `muru-backend-local` / `master` (`23edcaa`) | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh` OK; `/api/health` 200; `/api/catalog/tree` без initData → 200 | vitest 62/321 |
-| DEP-020 | Hotfix O-2+O-4: storefront `/img/` proxy + category covers | `muru-storefront` / `main` (`04d5222`) | verified | **deployed** (Василий, 2026-07-14) | recovery `npm ci --include=dev` → build → restart | curl `/catalog/`: 8× cover via `murushop.ru/img/` |
+| DEP-020 | Hotfix O-2+O-4: storefront `/img/` proxy + category covers | `muru-storefront` / `main` (`04d5222`) | verified | **deployed** (Василий, 2026-07-14) | recovery `npm ci --include=dev` → build → restart | curl `/catalog/`: 8× cover via `murushop.ru/img/`; smoke O-4/6 ✅ |
+| DEP-021 | Hotfix O-5: admin CRM photo preview on re-edit | `muru-backend-local` / `master` (`cf5c0a3`) | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh` OK; admin rebuild | `productToImageSlots` → `/img/crm_*/600.webp` |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -343,7 +344,8 @@
 ## Лог сессий
 - **2026-07-14 (сессия 9)**: **Hotfix verified (2026-07-14-03 + storefront O-2/O-4).** Backend: O-3 `isNew` fix; O-1 `miniappMaintenanceUnlessNoTelegramInitData` on catalog/cdek; vitest **62/321** (оркестратор). Storefront: `resolveCatalogImageUrl`, `adaptTree` coverImageUrl; tsc OK. Commit/deploy pending → DEP-019, DEP-020.
 - **2026-07-14 (сессия 10)**: **Deploy verify.** DEP-019 **deployed** @ `23edcaa`. DEP-020 **failed** build → 502; fix `npm ci --include=dev` (DEPLOY.md).
-- **2026-07-14 (сессия 11)**: **Storefront recovery + post-deploy smoke.** DEP-020 **deployed** after recovery; `web.murushop.ru` 200. Smoke: CRM фото/описание на web ✅; admin re-edit фото не видно (O-5); create product ✅; `MINIAPP_MAINTENANCE=true` ещё не снят; category covers — user reports missing, curl `/catalog/` shows 8 proxied covers (cache?).
+- **2026-07-14 (сессия 11)**: **Storefront recovery + post-deploy smoke.** DEP-020 **deployed** after recovery; `web.murushop.ru` 200. Smoke: CRM фото/описание на web ✅; create product ✅; O-4/6 covers ✅; `MINIAPP_MAINTENANCE=true` ещё не снят.
+- **2026-07-14 (сессия 12)**: **O-5 verified + deployed (DEP-021).** `cf5c0a3` — `admin/src/lib/images.ts`, `productToImageSlots`; `deploy.sh` OK.
 - **2026-07-14 (сессия 8)**: **CUTOVER ВЫПОЛНЕН (DEP-018).** Финальный sync #54 (264 SKU); backup 177K; `CATALOG_SOURCE=crm` + reload; смоук: invoice ✅, витрина ✅, CRM edit ✅, `/img/crm_*` 200, archive/unarchive ✅. П.8 TG sync 423 — pending confirm.
 - **2026-07-14 (сессия 7)**: **TD-003 closed.** `/var/www/muru/.env`: `CDEK_SENDER_ADDRESS` в двойных кавычках; `source .env` + `echo` — адрес со скобками без literal `"`; `pm2 reload ecosystem.config.js --update-env` OK.
 - **2026-07-14 (сессия 6)**: **TD-002 closed.** Staging `/var/www/muru-staging` `1e439bf` → `1392cb7` (`reset --hard origin/master`, `deploy-staging.sh`); backend+admin build OK; `api-staging.murushop.ru/api/health` 200 db connected; prod PM2 ↺131 без изменений. Оркестратор: независимый curl health 200.
