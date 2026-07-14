@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-14 (фаза D закрыта)
+Последнее обновление: 2026-07-14 (cutover prep merged, DEP-017 pending)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -80,7 +80,12 @@
   - **ИТОГ ФАЗЫ: унификация бэкендов U1-U4 полностью завершена и верифицирована за одну сессию 2026-07-06.** Единый канон `muru-backend-local/master` = прод (`/var/www/muru`, деплой напрямую). `MURU_miniAPP` заморожен. Форвард-порт больше не нужен. Точка отката на прод: `origin` = `MURU_miniAPP.git`, SHA `2c97f0e`.
 
 ## Следующее
-- **Cutover prep:** ветка `fix/env-maintenance-cutover` в `muru-backend-local` (env log, maintenance, invoice guard, sync 423, тесты) — verify → merge → deploy перед окном cutover (`CUTOVER.md`).
+- **DEP-017 deploy:** `master` @ `da280b2` на VPS (`git pull` + `deploy.sh`) — env log, maintenance, invoice guard, sync 423. Миграций нет.
+- **Cutover окно:** операции по `CUTOVER.md` (консолидация `/var/www/muru/.env`, `MINIAPP_MAINTENANCE`, флип `CATALOG_SOURCE=crm`) — после DEP-017.
+
+## Cutover prep (код, merged 2026-07-14)
+
+**master @ `da280b2`** (FF `1e439bf→da280b2`, 4 коммита): `[env] loaded`, `MINIAPP_MAINTENANCE` + заглушка mini app, guard invoice URL `https://t.me/$`, sync 423 в crm, тесты 62/311. Ранбук — `CUTOVER.md`. **Не на VPS** (DEP-017).
 
 ## Фаза: Админка A (фундамент — auth, роли, каркас)
 
@@ -306,6 +311,7 @@
 | DEP-014 | D7: CRM categories web tree + safe delete | `muru-backend-local` / `master` (`8fa0f38`) | verified | **deployed** (Василий, 2026-07-13) | FF `e5cc51c→8fa0f38`; `deploy.sh`; без миграции | браузерный смоук categories — по желанию |
 | DEP-015 | D7.1: DISTINCT directProductCount hotfix | `muru-backend-local` / `master` (`2d20658`) | verified | **deployed** (Василий, 2026-07-13) | FF `8fa0f38→2d20658`; smoke cat#821: 49/1/2 | — |
 | DEP-016 | D8: migration 019 + nginx `/img/` | `muru-backend-local` / `master` (`0877d6d`) | verified | **deployed** (Василий, 2026-07-13) | psql 019 (NOTICE skip OK); `sync-nginx-murushop.sh`; `/img/` → 200 | TD-001, TD-004 closed |
+| DEP-017 | Cutover prep: env log, `MINIAPP_MAINTENANCE`, invoice guard, sync 423 crm | `muru-backend-local` / `master` (`da280b2`) | verified | pending | `git pull` + `deploy.sh`; без миграции | Cutover окно — `CUTOVER.md` после deploy |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -347,6 +353,7 @@
 - **2026-07-13 (сессия 3)**: **D1 verified** (оркестратор): миграция 018, env guards, CRM catalog CRUD, публичный `is_archived`, 54/275 тестов. Коммит `6e0d3fe` на `admin-phase-d`.
 - **2026-07-13 (сессия 4)**: **D2 verified** + коммит `0d29b46`: categories/characteristics/upload-image, image-proxy CRM bypass, 55 файлов / 284 теста.
 - **2026-07-13 (сессия 5)**: **D3 verified** + коммит `484878d`: export xlsx/csv, import dry-run + upsert без purge, 58/294 тестов.
+- **2026-07-14 (сессия 3)**: **Cutover prep verified + merged.** `master` @ `da280b2` (4 коммита `8417247`→`da280b2`), push OK; vitest 62/311; DEP-017 pending deploy. `muru-docs` `5cbd631` (CUTOVER.md env consolidation).
 - **2026-07-14 (сессия 2)**: Cutover prep — ветка `fix/env-maintenance-cutover`: env observability, `MINIAPP_MAINTENANCE`, invoice URL guard, admin sync 423 в crm, тесты 62/311, `CUTOVER.md` обновлён. Merge/deploy — pending.
 - **2026-07-14**: **Фаза D закрыта.** D8.1 FF-merge в `master` (`1e439bf`), push OK, деплой не требуется (только тесты). TD-005 closed. Следующий шаг — по промпту Василия.
 - **2026-07-13 (сессия 15)**: **D8.1 verified** (`admin-phase-d81`): mock `env.isCatalogCrmMode` в sync-scheduler.test.ts + тест crm skip. vitest 299/299 green (default + `CATALOG_SOURCE=crm`). TD-005 closed.
