@@ -229,12 +229,17 @@ pm2 reload ecosystem.config.js --update-env
 ```bash
 cd /var/www/muru-storefront
 git pull origin main
-npm ci
+# На VPS часто NODE_ENV=production → npm ci без флага не ставит devDependencies
+# (@tailwindcss/postcss, msw нужны на этапе build). Всегда --include=dev до сборки.
+npm ci --include=dev
 NODE_OPTIONS=--max-old-space-size=2048 npm run build
+# Только после успешного build — можно урезать node_modules для runtime
 npm ci --omit=dev
 pm2 restart muru-storefront
 pm2 save
 ```
+
+> **Recovery после failed build (502):** не делать `pm2 restart` и `npm ci --omit=dev`, пока `npm run build` не прошёл. `rm -rf .next node_modules && npm ci --include=dev && npm run build`, затем restart.
 
 > Бэкенд на VPS должен быть жив на время `npm run build` — `sitemap.xml` ходит в API. Меню каталога (`catalog-menu`) при недоступном API деградирует мягко (DEP-007).
 

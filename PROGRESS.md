@@ -82,7 +82,7 @@
 
 ## Следующее
 - **Боевая валидация** (§4 `CUTOVER.md`): ~30 товаров через CRM; freeze Sheets с клиентом (п.6).
-- **Hotfix follow-up:** admin `ProductEditPage` create (`isNew = !id || id === 'new'`); storefront `/img/` для CRM-фото; category `coverImageUrl` в `adaptTree`.
+- **Hotfix follow-up:** ~~admin create~~ ✅ DEP-019; ~~maintenance vs web~~ ✅ DEP-019; ~~storefront `/img/`~~ ✅ DEP-020; **admin re-edit photo preview** (O-5) — баг; **category covers on web** — проверить hard refresh `/catalog/`.
 - **Операционно:** пре-чеклист п.8 (`backend/.env` → `.unused`); подтвердить п.8 смоука (TG sync 423).
 
 ## Cutover (операционный, 2026-07-14) — ВЫПОЛНЕН
@@ -320,13 +320,15 @@
 | DEP-015 | D7.1: DISTINCT directProductCount hotfix | `muru-backend-local` / `master` (`2d20658`) | verified | **deployed** (Василий, 2026-07-13) | FF `8fa0f38→2d20658`; smoke cat#821: 49/1/2 | — |
 | DEP-016 | D8: migration 019 + nginx `/img/` | `muru-backend-local` / `master` (`0877d6d`) | verified | **deployed** (Василий, 2026-07-13) | psql 019 (NOTICE skip OK); `sync-nginx-murushop.sh`; `/img/` → 200 | TD-001, TD-004 closed |
 | DEP-017 | Cutover prep + invoice hotfix: env log, `MINIAPP_MAINTENANCE`, sync 423 crm, invoice `telegram.me`→`t.me` | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | `git pull` + `deploy.sh`; без миграции | Prod smoke: mini app invoice OK |
-| DEP-018 | **Cutover:** `CATALOG_SOURCE=crm`, final sync 264, backup, smoke | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | env flip + `pm2 reload`; backup `/root/backups/muru_db_pre_cutover_2026-07-14_0843.dump` | Смоук §3; follow-up: admin create, storefront CRM images |
+| DEP-018 | **Cutover:** `CATALOG_SOURCE=crm`, final sync 264, backup, smoke | `muru-backend-local` / `master` (`1392cb7`) | verified | **deployed** (Василий, 2026-07-14) | env flip + `pm2 reload`; backup `/root/backups/muru_db_pre_cutover_2026-07-14_0843.dump` | Смоук §3; follow-up hotfix → DEP-019 |
+| DEP-019 | Hotfix O-1+O-3: maintenance unless no initData (web OK); admin create product | `muru-backend-local` / `master` (`23edcaa`) | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh` OK; `/api/health` 200; `/api/catalog/tree` без initData → 200 | vitest 62/321 |
+| DEP-020 | Hotfix O-2+O-4: storefront `/img/` proxy + category covers | `muru-storefront` / `main` (`04d5222`) | verified | **deployed** (Василий, 2026-07-14) | recovery `npm ci --include=dev` → build → restart | curl `/catalog/`: 8× cover via `murushop.ru/img/` |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
 ## Бэклог (не терять)
 - Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко. **+ cutover 2026-07-14:** топ-категории на `web.murushop.ru` — `adaptTree()` не мапит `coverImageUrl`; CRM-фото товаров на витрине — нужен `/img/` proxy как в mini app.
-- **Admin create product:** route `products/new` → `useParams().id` undefined; fix `isNew = !id || id === 'new'` (`ProductEditPage.tsx`).
+- **Admin create product:** ~~route `products/new` bug~~ ✅ fix verified (`isNew = !id || id === 'new'`), DEP-019 pending deploy.
 - ~~Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).~~ ✅ ЗАКРЫТО 2026-07-06 (унификация U1-U4, `MURU_miniAPP` заморожен `7877be1`, прод на каноне DEP-008).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
 - CDEK debug-урок для памяти: ранний симптом «расчёт цены не приходит» (сессия 2026-07-02) свёлся к пустым CDEK-кредам в `.env` на момент теста — сам расчётный код был исправен с самого начала. Перед глубоким дебагом смотреть `.env` в первую очередь.
@@ -339,7 +341,10 @@
 Заказчик прислал рецензию ТЗ + Арина 6 пунктов маркетинга (30.06.2026). Это **отдельный оплачиваемый этап, НЕ входит в 470k v1**. Детали и триаж — в `SPEC.md` → блок v0.2.
 
 ## Лог сессий
-- **2026-07-14 (сессия 8)**: **CUTOVER ВЫПОЛНЕН (DEP-018).** Финальный sync #54 (264 SKU); backup 177K; `CATALOG_SOURCE=crm` + reload; смоук: invoice ✅, витрина ✅, CRM edit ✅, `/img/crm_*` 200, archive/unarchive ✅. Follow-up: admin create bug, storefront CRM images. П.8 TG sync 423 — pending confirm.
+- **2026-07-14 (сессия 9)**: **Hotfix verified (2026-07-14-03 + storefront O-2/O-4).** Backend: O-3 `isNew` fix; O-1 `miniappMaintenanceUnlessNoTelegramInitData` on catalog/cdek; vitest **62/321** (оркестратор). Storefront: `resolveCatalogImageUrl`, `adaptTree` coverImageUrl; tsc OK. Commit/deploy pending → DEP-019, DEP-020.
+- **2026-07-14 (сессия 10)**: **Deploy verify.** DEP-019 **deployed** @ `23edcaa`. DEP-020 **failed** build → 502; fix `npm ci --include=dev` (DEPLOY.md).
+- **2026-07-14 (сессия 11)**: **Storefront recovery + post-deploy smoke.** DEP-020 **deployed** after recovery; `web.murushop.ru` 200. Smoke: CRM фото/описание на web ✅; admin re-edit фото не видно (O-5); create product ✅; `MINIAPP_MAINTENANCE=true` ещё не снят; category covers — user reports missing, curl `/catalog/` shows 8 proxied covers (cache?).
+- **2026-07-14 (сессия 8)**: **CUTOVER ВЫПОЛНЕН (DEP-018).** Финальный sync #54 (264 SKU); backup 177K; `CATALOG_SOURCE=crm` + reload; смоук: invoice ✅, витрина ✅, CRM edit ✅, `/img/crm_*` 200, archive/unarchive ✅. П.8 TG sync 423 — pending confirm.
 - **2026-07-14 (сессия 7)**: **TD-003 closed.** `/var/www/muru/.env`: `CDEK_SENDER_ADDRESS` в двойных кавычках; `source .env` + `echo` — адрес со скобками без literal `"`; `pm2 reload ecosystem.config.js --update-env` OK.
 - **2026-07-14 (сессия 6)**: **TD-002 closed.** Staging `/var/www/muru-staging` `1e439bf` → `1392cb7` (`reset --hard origin/master`, `deploy-staging.sh`); backend+admin build OK; `api-staging.murushop.ru/api/health` 200 db connected; prod PM2 ↺131 без изменений. Оркестратор: независимый curl health 200.
 - **2026-07-01**: шаг 3 (3a/3b/3c) выполнен и проверен. Заведены muru-docs, PROGRESS.md, SPEC.md. Получены рецензия заказчика и 6 пунктов Арины → зафиксированы в SPEC v0.2 как pending.
