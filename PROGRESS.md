@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-13 (D8.1 verified, merge pending)
+Последнее обновление: 2026-07-14 (фаза D закрыта)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -80,7 +80,7 @@
   - **ИТОГ ФАЗЫ: унификация бэкендов U1-U4 полностью завершена и верифицирована за одну сессию 2026-07-06.** Единый канон `muru-backend-local/master` = прод (`/var/www/muru`, деплой напрямую). `MURU_miniAPP` заморожен. Форвард-порт больше не нужен. Точка отката на прод: `origin` = `MURU_miniAPP.git`, SHA `2c97f0e`.
 
 ## Следующее
-- **D8.1 merge:** FF `admin-phase-d81` → `master`, push (deploy не нужен — только тесты).
+- **Cutover prep:** ветка `fix/env-maintenance-cutover` в `muru-backend-local` (env log, maintenance, invoice guard, sync 423, тесты) — verify → merge → deploy перед окном cutover (`CUTOVER.md`).
 
 ## Фаза: Админка A (фундамент — auth, роли, каркас)
 
@@ -250,7 +250,9 @@
 | **D7** | Категории: web-дерево + фикс delete (cross-placements) | **DEPLOYED** (`master` @ `8fa0f38`, DEP-014) |
 | **D7.1** | Hotfix: `COUNT(DISTINCT p.id)` в directProductCount | **DEPLOYED** (`master` @ `2d20658`, DEP-015) |
 | **D8** | Migration 019 subcategory + nginx `/img/` | **DEPLOYED** (`master` @ `0877d6d`, DEP-016) |
-| **D8.1** | TD-005: mock env in sync-scheduler.test.ts | **ВЕРИФИЦИРОВАН 2026-07-13** (`admin-phase-d81`, uncommitted) |
+| **D8.1** | TD-005: mock env in sync-scheduler.test.ts | **MERGED** (`master` @ `1e439bf`, push OK; deploy не нужен) |
+
+- **ИТОГ ФАЗЫ: «Админка D: CRM Каталог» (D1–D8.1) полностью завершена и верифицирована 2026-07-14.** Live: `https://murushop.ru/admin/catalog`, API `/api/crm/catalog/*`, nginx `/img/`, migration 018/019 на прод-БД. Прод в режиме `CATALOG_SOURCE=sheets` (CRM read-only, sync из Google Sheets). Полный cutover на `crm` — операционный шаг вне фазы, ранбук `CUTOVER.md`. Откат кода: `git reset --hard f256a39` + `deploy.sh` (миграции 018/019 аддитивны).
 
 ### Env-заметка (D1)
 Сейчас в коде `CATALOG_SOURCE` = `'xlsx'|'sheets'|'crm'` в Zod; верхний уровень владения — `'sheets'|'crm'`. Legacy `xlsx` → `catalogSource='sheets'` + `googleCatalogReadMode='xlsx'`. Экспорт: `catalogSource`, `googleCatalogReadMode`, `isCatalogCrmMode`. **D1 verified:** guards, CRUD, публичный фильтр `is_archived`, 54/275 тестов.
@@ -345,7 +347,9 @@
 - **2026-07-13 (сессия 3)**: **D1 verified** (оркестратор): миграция 018, env guards, CRM catalog CRUD, публичный `is_archived`, 54/275 тестов. Коммит `6e0d3fe` на `admin-phase-d`.
 - **2026-07-13 (сессия 4)**: **D2 verified** + коммит `0d29b46`: categories/characteristics/upload-image, image-proxy CRM bypass, 55 файлов / 284 теста.
 - **2026-07-13 (сессия 5)**: **D3 verified** + коммит `484878d`: export xlsx/csv, import dry-run + upsert без purge, 58/294 тестов.
-- **2026-07-13 (сессия 15)**: **D8.1 verified** (`admin-phase-d81`): mock `env.isCatalogCrmMode` в sync-scheduler.test.ts + тест crm skip. vitest 299/299 green (default + `CATALOG_SOURCE=crm`). TD-005 closed. Merge pending, deploy не нужен.
+- **2026-07-14 (сессия 2)**: Cutover prep — ветка `fix/env-maintenance-cutover`: env observability, `MINIAPP_MAINTENANCE`, invoice URL guard, admin sync 423 в crm, тесты 62/311, `CUTOVER.md` обновлён. Merge/deploy — pending.
+- **2026-07-14**: **Фаза D закрыта.** D8.1 FF-merge в `master` (`1e439bf`), push OK, деплой не требуется (только тесты). TD-005 closed. Следующий шаг — по промпту Василия.
+- **2026-07-13 (сессия 15)**: **D8.1 verified** (`admin-phase-d81`): mock `env.isCatalogCrmMode` в sync-scheduler.test.ts + тест crm skip. vitest 299/299 green (default + `CATALOG_SOURCE=crm`). TD-005 closed.
 - **2026-07-13 (сессия 14)**: **DEP-016 deployed.** D8 @ `0877d6d`: migration 019 + nginx `/img/`; smoke `/img/` → 200. TD-001, TD-004 closed.
 - **2026-07-13 (сессия 12)**: **DEP-015 deployed.** D7.1 hotfix `2d20658` на прод. Smoke cat#821: 49/1/2.
 - **2026-07-13 (сессия 11)**: **D7.1 verified** (`admin-phase-d71`): `COUNT(DISTINCT p.id)` + test assert. vitest 59/298.

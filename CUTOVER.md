@@ -1,12 +1,17 @@
 # CUTOVER: Google Sheets → CRM (владелец каталога)
 
-**Статус:** подготовлен 2026-07-13, ожидает окна. Прод: `master @ 0877d6d` (D8, DEP-016).
+**Статус:** подготовлен 2026-07-13, ожидает окна. Прод: `master @ 1e439bf` (фаза D закрыта, D8.1 merged).
 **Решение:** каталог переводится на CRM как единственный источник записи. Sheets после
 переключения — **read-only навсегда** (жёсткая заморозка, дубль-записи нет — см.
 PROGRESS.md, архитектурное решение фазы D).
 **Даунтайм не нужен:** чтение каналов (mini app, витрина) идёт из PostgreSQL и не меняется.
 Флип `CATALOG_SOURCE` меняет только владельца записи. Откат = вернуть флаг.
 **Триггер боевой валидации:** заказчик добавляет ~30 новых товаров — вносятся уже через CRM.
+
+**Env на проде (важно):** PM2-процесс стартует с `cwd=/var/www/muru`; `backend/src/utils/env.ts`
+берёт **первый** существующий файл из `envCandidatePaths` → **`/var/www/muru/.env`**.
+Файл `/var/www/muru/backend/.env` процессом **не читается**. После деплоя проверять
+`pm2 logs`: строка `[env] loaded: /var/www/muru/.env`.
 
 ---
 
@@ -21,12 +26,23 @@ PROGRESS.md, архитектурное решение фазы D).
 | 5 | Staging `/var/www/muru-staging` синхронизирован с `master @ 0877d6d` (TD-002) | ☐ |
 | 6 | Договорённость с клиентом о freeze таблицы: дата/время; после — Sheets только чтение | ☐ |
 | 7 | Бэкап прод-БД непосредственно перед окном (`pg_dump muru_db`) | ☐ в окне |
+| 8 | Два `.env` на VPS сведены: канон — `/var/www/muru/.env`; `backend/.env` → `.unused` | ☐ |
 
 ---
 
 ## 2. Окно переключения (~1–2 ч, вечер)
 
 Все команды — на VPS, Василий по этому ранбуку. Прод не останавливается.
+
+### 2.0. Режим обслуживания mini app (до флипа)
+В **`/var/www/muru/.env`** (корневой, см. §2.4):
+```
+MINIAPP_MAINTENANCE=true
+```
+- Покупатели видят заглушку «Магазин скоро откроется».
+- Админы из `ADMIN_TELEGRAM_IDS` проходят (каталог, TG-админка, sync).
+- Снять флаг — после зелёного смоука §3 (`MINIAPP_MAINTENANCE=false` + `pm2 reload --update-env`),
+  либо оставить до конца боевой валидации §4 — по решению Василия.
 
 ### 2.1. Финальный sync из Sheets
 - В TG-админке запустить ручной sync каталога, дождаться успеха.
@@ -42,18 +58,35 @@ PROGRESS.md, архитектурное решение фазы D).
 pg_dump -Fc muru_db > /root/backups/muru_db_pre_cutover_$(date +%F_%H%M).dump
 ```
 
-### 2.4. Флип флагов
-В `/var/www/muru/backend/.env`:
-```
-CATALOG_SOURCE=crm
-ENABLE_SHEETS_STOCK_WRITE=false
-```
-Проверить: строки ровно по одной (без дубликатов, п.4 пре-чеклиста).
+### 2.4. Консолидация env + флип флагов
+**Канонический файл env — `/var/www/muru/.env`** (НЕ `backend/.env`).
+
+1. Сравнить оба файла и перенести актуальные значения в корневой:
+   ```bash
+   diff <(sort /var/www/muru/.env) <(sort /var/www/muru/backend/.env)
+   grep -c 'CATALOG_SOURCE' /var/www/muru/.env   # должно быть ровно 1
+   ```
+2. Убедиться, что в корневом `.env` есть актуальные `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_PROVIDER_TOKEN`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `ADMIN_JWT_SECRET`.
+3. Переименовать лишний файл (чтобы резолвер не подхватил его при смене cwd):
+   ```bash
+   mv /var/www/muru/backend/.env /var/www/muru/backend/.env.unused
+   ```
+4. В **`/var/www/muru/.env`** выставить:
+   ```
+   CATALOG_SOURCE=crm
+   ENABLE_SHEETS_STOCK_WRITE=false
+   ```
+   Проверить: каждая переменная — одна строка, без дубликатов (п.4 пре-чеклиста).
 
 ### 2.5. Рестарт
 ```bash
 cd /var/www/muru && pm2 reload ecosystem.config.js --update-env && pm2 save
-pm2 logs muru-backend --lines 50   # нет ошибок env-валидации; есть строка про crm-режим
+pm2 logs muru-backend --lines 50
+# Ожидание: [env] loaded: /var/www/muru/.env
+#           crm-режим / skipped sync — без env-ошибок
+pm2 env $(pm2 id muru-backend | head -1) | grep CATALOG_SOURCE
+# Ожидание: CATALOG_SOURCE=crm
 ```
 
 ---
@@ -62,14 +95,16 @@ pm2 logs muru-backend --lines 50   # нет ошибок env-валидации;
 
 | # | Проверка | Ожидание |
 |---|---|---|
+| 0 | `pm2 logs muru-backend` — строка `[env] loaded:` | указывает на **`/var/www/muru/.env`** |
 | 1 | `curl -sS http://127.0.0.1:4000/api/health` | 200 |
-| 2 | Mini App: каталог открывается, тестовый заказ до инвойса | OK |
+| 2 | Mini App (админ): каталог → тестовый заказ до инвойса | OK; **`invoiceUrl` начинается с `https://t.me/$`** |
 | 3 | Витрина `web.murushop.ru`: каталог, карточка, корзина | OK |
 | 4 | CRM `/admin/catalog`: meta показывает **не** read-only (crm-режим, запись разрешена) | OK |
 | 5 | CRM: создать тестовый товар с фото → виден в mini app И на витрине | OK |
 | 6 | `/img/<fileId>` для фото нового товара | 200, из кэша при повторе |
 | 7 | CRM: архивировать тестовый товар → исчез из обоих каналов | OK |
 | 8 | TG-админка: ручной sync недоступен/заблокирован в crm-режиме (423 или скрыт) | OK |
+| 9 | Снять `MINIAPP_MAINTENANCE=false` (если был включён в §2.0) + reload; покупатель видит каталог | OK |
 
 Если п.5–7 не проходят — откат (см. §5), разбор на staging.
 
@@ -86,7 +121,7 @@ pm2 logs muru-backend --lines 50   # нет ошибок env-валидации;
 битые изображения, не решаемые точечно.
 
 ```bash
-# 1. Вернуть в .env: CATALOG_SOURCE=xlsx  (legacy-алиас sheets), убрать/оставить ENABLE_SHEETS_STOCK_WRITE=false
+# 1. Вернуть в /var/www/muru/.env: CATALOG_SOURCE=xlsx  (legacy-алиас sheets), ENABLE_SHEETS_STOCK_WRITE=false
 # 2. pm2 reload ecosystem.config.js --update-env
 # 3. В TG-админке включить расписание sync обратно
 # 4. Товары, созданные через CRM за это время, руками перенести в Sheets ДО первого sync
@@ -99,7 +134,5 @@ pm2 logs muru-backend --lines 50   # нет ошибок env-валидации;
 ## 6. Пост-стабилизация
 
 - Чистка категорий-сирот («не используется») через CRM (safe delete из D7 с guard'ами).
-- TD-005: герметичность `sync-scheduler.test.ts` — тест падает (2/298) при локальном
-  `.env` с `CATALOG_SOURCE=crm`; замокать `../utils/env` в тесте. После cutover
-  crm-режим в `.env` станет нормой — фикс обязателен до следующей фазы.
+- ~~TD-005: герметичность `sync-scheduler.test.ts`~~ ✅ закрыто D8.1 (`1e439bf`).
 - Обновить PROGRESS.md (DEP-строка cutover) и DEPLOY.md (§ sync больше не операция прод-каталога).
