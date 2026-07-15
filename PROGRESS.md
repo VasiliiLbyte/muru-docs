@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-14 (CUTOVER выполнен, `CATALOG_SOURCE=crm`, DEP-018)
+Последнее обновление: 2026-07-15 (Admin Design System **COMPLETE** @ `bcc4be7`; merge/deploy — отдельное решение)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -80,10 +80,112 @@
   - **U4-post (заморозка `MURU_miniAPP`) ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-06** (промпт `2026-07-06-02`, коммит `7877be1` на `MURU_miniAPP/master`, push OK): баннер «⚠️ Репозиторий заморожен (2026-07-06). Канон и прод-деплой: `VasiliiLbyte/muru-backend-local`» первыми строками README, `git show 7877be1 --stat` → только README.md +2 строки (verified оркестратором). GitHub archive — опционально, за Василием. Финальное обновление `DEPLOY.md` (карта окружений, §2a staging, §7 webhook), `FORWARD_PORT.md` (deprecated), `ORCHESTRATOR.md` (карта репо, `MURU_miniAPP` заморожен) — выполнено.
   - **ИТОГ ФАЗЫ: унификация бэкендов U1-U4 полностью завершена и верифицирована за одну сессию 2026-07-06.** Единый канон `muru-backend-local/master` = прод (`/var/www/muru`, деплой напрямую). `MURU_miniAPP` заморожен. Форвард-порт больше не нужен. Точка отката на прод: `origin` = `MURU_miniAPP.git`, SHA `2c97f0e`.
 
+- **Cat v2 D+E + follow-ups — ВЫПОЛНЕНО и MERGED 2026-07-15** (`origin/master`=`0482f00`, `origin/main`=`34b67bb`):
+  - **D** (`d1af333`): admin «Каталог и разделы» — hub, CategoryDetail, GiftGuide, redirects; Content = pages+banners.
+  - **E1** (`9aeeb5a`): migration `026`, CRM/public hotspot API, vitest 355→361.
+  - **E2** (`84a78d3`): `HotspotEditor` на lookbook edit.
+  - **E3** (`d028b74`): storefront hero hotspots + ProductGrid + `generateStaticParams`.
+  - **F1** (`3499101`): hero natural aspect ratio (не 21:9 crop).
+  - **G1** (`d5c9a3e`): `banner_image` column, migration `027`, cover≠banner API.
+  - **G2** (`0482f00`): admin Обложка/Баннер, галерея убрана, hotspots на banner.
+  - **G3** (`4383933`): storefront banner, portal popover flip, gallery removed.
+  - **H1** (`34b67bb`): compact square cards на `/lookbooks/`.
+  - **Prod:** DEP-026/027/028 deployed; browser smoke OK. **Merge:** FF `feature/crm-categories-e`→`master`, `feature/inspiration-hotspots`→`main` (сессия 21). **VPS checkout:** `/var/www/muru`→`master`=`0482f00`, `/var/www/muru-storefront`→`main`=`34b67bb`, migration `027` (`banner_image`) — OK; curl smoke 4×200. **Pending:** mini app regression smoke.
+
 ## Следующее
+- **Admin Design System merge:** FF `feature/admin-design-system` → `master` (`bcc4be7`, 6 коммитов UI-1…UI-4) — по решению Василия; затем деплой admin bundle (`deploy.sh`, без миграций). **Manual smoke до merge (рекомендуется):** login → dashboard → products (filters+table) → product edit (★+toast) → order confirm → TipTap prompt → hotspot drag → DevTools `prefers-reduced-motion`.
+- **Mini App regression smoke (обязательно):** каталог → корзина → checkout TG после merge; записать PASS/FAIL в PROGRESS.
+- **Контент вдохновения:** в admin — отдельно обложка (сетка) и баннер (hotspot'ы) для каждого лукбука.
+- **Follow-up (не блокеры):** HTML description на storefront; стиль маркеров hotspot; DEP-025 admin preview covers.
+- **Follow-up (DEP-025, опц.):** admin preview обложек категорий/подкатегорий через `/img/`; ↑↓ порядок подкатегорий при `sort_order=0`.
 - **Боевая валидация** (§4 `CUTOVER.md`): ~30 товаров через CRM; freeze Sheets с клиентом (п.6).
 - **Hotfix follow-up:** ~~O-1..O-5~~ ✅ DEP-019/020/021 deployed. Open: `MINIAPP_MAINTENANCE=false`, cutover §3.8 TG sync 423.
 - **Операционно:** пре-чеклист п.8 (`backend/.env` → `.unused`); подтвердить п.8 смоука (TG sync 423).
+
+## Фаза: Категории v2 (A/B/C — реструктуризация категорий/подкатегорий CRM)
+
+**Старт:** 2026-07-14. **Цель:** товар — одна основная категория + 0..N подкатегорий-сущностей (не текст); виртуальная «Распродажа» (по `discount_percent>0`, без ручного назначения); чекбокс «Гид по подаркам»; фиксированные характеристики в `specs`. ТЗ — промпт Василия целиком в сессии, детали архитектуры см. коммиты/диффы ниже.
+
+**Репозитории:** `muru-backend-local` (`backend/`+`admin/`), ветки `feature/crm-categories-a`/`-b`/`-c` от `master`; `muru-storefront` — только точечные правки при необходимости. Порядок строго A→B→C, стоп и ревью после каждой фазы. Прод/staging не трогаются до отдельного решения о деплое (после C или по фазам — решить отдельно).
+
+**Merge/push (2026-07-15):** `origin/master` = `0482f00`, `muru-storefront/main` = `34b67bb`. **Prod deployed** DEP-026/027/028 (сессии 19–21).
+
+### Prod-раскатка (2026-07-14) — ВЫПОЛНЕНА и ВЕРИФИЦИРОВАНА
+
+**VPS:** `/var/www/muru` @ `14f438b`, PM2 `muru-backend` ↺139; `/var/www/muru-storefront` @ `58d43dd`, PM2 ↺39. Backup: `/root/backups/muru_db_pre_categories_v2_2026-07-14_1619.dump` (107K). Откат: код `cf5c0a3` + restore дампа.
+
+**Pre-check:** taxonomy `web_sub=243, sub=0` (источник 024 — `web_subcategory_name`); 18 SKU в прямой «Распродажа»; virtual Sale=20; categories=23.
+
+**Миграции 020–025:** все exit 0. 020: 13 junk удалено; 021: 18 SKU → «Без категории»; 024: **17 subcategories / 242 links**; post: categories=10, bez_kategorii=19, direct_sale=0.
+
+**Deploy + API smoke:** health ok; Sale **20**; giftGuide **0**; tree subcategories **17**; admin login **200**; PATCH→Sale **409**.
+
+**Storefront:** build 28/28, `/gifts/` **200**, home/catalog **200**. Build-warn: CMS content 404 → static fallback (ожидаемо, не регрессия).
+
+**Инциденты (не блокеры):** `.env` канон — `/var/www/muru/.env` (не `backend/`); `pg_dump`/`psql` через `DATABASE_URL`; login smoke — JSON без кавычек в пароле давал 500.
+
+### Staging-раскатка (2026-07-14) — ВЫПОЛНЕНА и ВЕРИФИЦИРОВАНА
+
+**VPS:** `api-staging.murushop.ru` / `/var/www/muru-staging` @ `14f438b`, PM2 `muru-backend-staging` (:4001), БД `muru_staging`. Backup: `/root/backups/muru_staging_pre_categories_v2_2026-07-14_1417.dump` (106K). Прод `muru-backend` ↺138 — не тронут.
+
+**Миграции 020–025:** идемпотентно OK. Ключевой гейт 024 на staging: источник taxonomy = **`web_subcategory_name`** (238 товаров, `subcategory` пуст); **16 subcategories / 238 links**. 021: **18 SKU** из прямой «Распродажа» → «Без категории»: MU0175–MU0190, MU0193, MU0200. 020: удалены 13 мусорных категорий-dубликатов.
+
+**API smoke (curl с VPS :4001):** Sale listing 20, giftGuide=0→после пометки; login 200; guards 409 (PATCH→Sale, rename/delete Sale); tree subcategories=16; `--data-urlencode` обязателен для кириллицы в query.
+
+**Admin smoke (local admin + SSH DB tunnel → staging БД):** 1✅ категории/подкатегории; 2✅ CRUD (preview обложек в таблице — битые `<img>`, данные в API OK, follow-up); 3✅ пустая подкатегория в дереве (`Тест304` под «Флористика») → **решение A: оставить** пустые в меню; 4✅ MU0185 `subcategoryIds [4,9]`, write-through `Сухоцветы`, листинги «Натуральный декор»+«Интерьер»; 5✅ specs фиксированные + «Тип»; 6✅ «Распродажа» нет в селекте + 409; 7✅ giftGuide `['MU0185']`; 8✅ Sale 20→19 при снятии скидки.
+
+**Инциденты по пути (не блокеры):** (1) миграции до `git pull` — файлов не было (HEAD `1392cb7`), исправлено порядком pull→migrate; (2) `source .env` на VPS ломается на скобках в `CDEK_SENDER_ADDRESS` — использовать `export DATABASE_URL=$(grep …)`; (3) local admin: `.env` перебивает tunnel URL — временная правка `DATABASE_URL` на `:5433` + restore из `.env.backup-local`.
+
+**STOP-гейт:** прод не тронут. Прод-раскатка — отдельный промпт (DEP-022…025).
+
+### Статус
+- **Фаза A (чистка категорий + виртуальная Распродажа) ВЫПОЛНЕНА и ВЕРИФИЦИРОВАНА 2026-07-14** (ветка `feature/crm-categories-a`, коммит `dc04b70`, не пушена/не смержена):
+  - Миграции `020_catalog_categories_cleanup.sql` (удаляет категории вне `TOP_LEVEL_CATEGORIES`+«Без категории» без активных товаров/крос-размещений, идемпотентно, `RAISE NOTICE`) и `021_catalog_sale_direct_reassign.sql` (переносит прямых товаров «Распродажа» → «Без категории», чистит крос-размещения на неё).
+  - `constants/catalog-top-level.ts`: `SALE_CATEGORY_NAME`. `catalog.service.ts`: виртуальное членство «Распродажа» в `getCatalogTree`/`getCatalogProducts` = активные товары с `discount_percent>0` (публичный контракт не менялся, только состав выборки).
+  - **Доп. гварды (решение оркестратора, приняты и подтверждены Василием):** `crm-catalog.service.ts` — 409 на прямое назначение `categoryId`=«Распродажа» при create/update товара; `crm-catalog-categories.service.ts` — 409 на удаление и на переименование/смену slug категории «Распродажа» (cover-патч разрешён).
+  - `admin/ProductEditPage.tsx`: «Распродажа» скрыта из select категории товара.
+  - **Верификация оркестратора (независимая, полная):** диффы всех 10 файлов прочитаны построчно и соответствуют промпту; `tsc --noEmit` (backend) и `tsc -b` (admin) — чисто (самостоятельный прогон); `vitest run` — **62 файла / 332 теста зелёные** (было 321, +11; 2 ложных фейла на первом прогоне — `connect EPERM`, сетевой шум сэндбокса на supertest-портах, не код, подтверждено повторным прогоном с `full_network` и изолированными прогонами каждого файла); БД `muru_local` после миграций — 10 категорий (удалена тестовая «Тратата»), у «Распродажа» прямых товаров 0, `discount_percent>0` активных — 21; живой `GET /api/catalog/tree` — узел «Распродажа» присутствует; `GET /api/catalog/products?categorySlug=распродажа` — 21 товар, у товаров в ответе их настоящая категория («Без категории», «Вазы и аксессуары», «Текстиль»), не «Распродажа».
+  - **Известное ограничение:** `category=Распродажа` + `subcategory`/`subcategorySlug` одновременно — фильтр по подкатегории не применяется (у виртуальной Распродажи подкатегорий нет до фазы B).
+  - Storefront: код не менялся (публичный контракт формы ответа не изменился); визуальная проверка `/catalog/rasprodazha/` — не прогонялась, следующий шаг по желанию.
+- **Фаза B (подкатегории как сущности) ВЫПОЛНЕНА и ВЕРИФИЦИРОВАНА 2026-07-14** (ветка `feature/crm-categories-b` от `feature/crm-categories-a`, коммит `f9e2327`, не пушена/не смержена):
+  - Миграции `022_subcategories.sql`/`023_product_subcategories.sql` (новые таблицы) + `024_subcategories_backfill.sql` (бэкфилл, идемпотентно).
+  - **Критичная находка при верификации, исправлено оркестратором на месте:** исходное ТЗ фазы B указывало источником бэкфилла `web_subcategory_name` — но прямой SQL-запрос к `muru_local` показал: это поле **пусто у всех 265 активных товаров** (легаси-фича «Web catalog F/G/H», DEP-004 2026-07-04, судя по всему клиент так и не заполнил эти столбцы в таблице), а реальные taxonomy-данные (243/265 товаров: «Посуда», «Сервировка», «Вазы и кувшины» и т.д.) лежат в другой легаси-колонке — `subcategory` (migration 019, D-фаза). Бэкфилл строго по ТЗ дал `Created 0 subcategory row(s)` — технически верно исполнено агентом, но результат бесполезен на реальных данных (публичное дерево с `?subcategories=1` отдавало пустые `children` везде). Оркестратор переписал миграцию 024 на `COALESCE(NULLIF(web_subcategory_name,''), NULLIF(subcategory,''))` (приоритет — «правильному» полю, если оно когда-то заполнится; фоллбэк — на легаси, где реально есть данные) — после фикса: **16 подкатегорий / 243 связки**, живой `GET /api/catalog/tree?subcategories=1` показывает реальные подкатегории по всем 7 обычным категориям («Посуда», «Сервировка», «Флористический инструмент», «Свет», «Постеры» и т.д.), «Распродажа» — пусто (верно, виртуальная). Идемпотентность повторного прогона подтверждена (0/0 на втором запуске).
+  - Write-through: `crm-catalog.service.ts` (`createCrmCatalogProduct`/`updateCrmCatalogProduct`) — транзакции (BEGIN/COMMIT/ROLLBACK), `subcategoryIds[0]` → денормализация в `web_subcategory_name/slug`+`subcategory/subcategory_slug`; `[]` → NULL; поле не передано → связки не трогаются. Новый файл `catalog-membership.helpers.ts` — переиспользуемые SQL-фрагменты OR-membership (прямая категория ИЛИ подкатегория-сущность ИЛИ cross-placement), использованы единообразно в `catalog.service.ts` (публичное дерево/листинг/счётчики) и `crm-catalog-categories.service.ts` (счётчики/delete-guard). Новый `crm-catalog-subcategories.service.ts` — CRUD под `/api/crm/categories/:id/subcategories` (409 на дубль slug и на удаление занятой подкатегории).
+  - Admin: `ProductEditPage.tsx` — мультиселект подкатегорий **по всем категориям** (не только по выбранной у товара), первая = основная (★), порядок кнопками ↑↓, текстовый инпут `webSubcategoryName` убран; `CategoriesPage.tsx` — полноценный CRUD подкатегорий (создание/переименование/обложка через существующий upload/порядок/удаление).
+  - **Верификация оркестратора (независимая, полная):** диффы всех 19 файлов прочитаны построчно; `tsc --noEmit`/`tsc -b` — чисто; `vitest run` — **63 файла / 341 тест зелёные** (было 332, +9), самостоятельный прогон совпал с отчётом; прямые SQL-запросы к `muru_local` до и после фикса миграции; живые curl к `/api/catalog/tree?subcategories=1` до и после. Storefront: код не менялся (публичный контракт формы не изменился, `coverImageUrl` у подкатегорий уже поддерживался типом `Category`/`CategoryGrid`) — визуальная проверка не прогонялась.
+  - **Риск на будущее:** на проде/staging нужно повторно проверить, действительно ли `subcategory` (не `web_subcategory_name`) — верный источник; если там иначе — миграция 024 всё равно корректна благодаря `COALESCE` (не потребует правок).
+- **Фаза C (характеристики + «Гид по подаркам») ВЫПОЛНЕНА и ВЕРИФИЦИРОВАНА 2026-07-14** (backend/admin: ветка `feature/crm-categories-c` от `feature/crm-categories-b`, коммит `14f438b`; storefront: `main`, коммит `58d43dd`, не пушен):
+  - Миграция `025_product_gift_guide.sql` (`is_gift_guide` + частичный индекс), применена к `muru_local`.
+  - `crm-catalog.service.ts`/`catalog.service.ts`: `isGiftGuide`/`giftGuide` в create/update/list/detail (CRM+публичный), аддитивный фильтр `giftGuide=true` в обоих API.
+  - Admin `ProductEditPage.tsx`: свободный редактор specs заменён на 4 фиксированных поля (Материал/Страна производитель/Размер/Бренд) + read-only «Тип» (авто из первой подкатегории). `buildSpecs()` берёт `product.specs` целиком за основу, удаляет только управляемые ключи — легаси-ключи (`Плотность ткани` и т.п.) не теряются (бэкенд по-прежнему делает полную замену `specs`, merge — целиком на фронте). Легаси `Страна` консолидируется в `Страна производитель` на сохранении. `size`-колонка синхронизируется со `specs['Размер']`.
+  - **Важная деталь верификации:** отчёт исполнителя явно указал 3 «ручные проверки» как невыполненные («осталось в UI») — оркестратор не принял отчёт на слово и прогнал их сам напрямую через реальный CRM API (не юнит-тестами) на живом `muru_local`: сброшен пароль локального owner (`seed:admin`), логин, `GET` детали MU0176 (id 165, реальный товар с `specs = {Тип, Бренд, Страна, Материал}` + временно инжектированный тестовый ключ `Плотность ткани` — удалён обратно после проверки), `PATCH` с телом, идентичным тому, что реально отправит `buildBody()`/`buildSpecs()` при изменении только «Материала». Результат совпал с ожиданием на 100%: `Плотность ткани` сохранился, `Страна` заменён на `Страна производитель`, `Тип` удалён (у MU0176 нет подкатегории — один из 18 SKU, переназначенных фазой A на «Без категории»), `Материал` обновлён, `Бренд`/`Размер` не потеряны. Далее: `isGiftGuide=true` на MU0176 → подтверждено оба фильтра (`GET /api/catalog/products?giftGuide=true` и `GET /api/crm/catalog/products?giftGuide=true` вернули ровно MU0176). Тестовые данные восстановлены в исходное состояние после проверки.
+  - Storefront: `/gifts/page.tsx` — реальная выборка `getProducts({ giftGuide: true, page, pageSize: 24 })` (client-side фильтр, как `onSale` — публичный каталог-бэк тянется целиком и фильтруется в Node, см. существующий паттерн) + `CatalogPagination` + пустое состояние. Живая проверка: локальный dev-сервер (`next dev`, порт 3000) против локального бэка — `/gifts/` → 200, товар с `isGiftGuide=true` (MU0176, «Керамический подсвечник») отрендерен.
+  - **Верификация оркестратора (независимая, полная):** диффы всех 17 файлов (12 backend/admin + 5 storefront) прочитаны построчно; `tsc --noEmit`/`tsc -b` (backend+admin) и `tsc --noEmit`+`next build` (storefront) — чисто, самостоятельный прогон; `vitest run` — **63 файла / 345 тестов** зелёные (было 341, +4).
+  - **Подтверждённый эффект по ТЗ (не баг):** первое сохранение через новую форму товара без подкатегории удаляет `specs['Тип']`, даже если там было sheet-импортированное значение — так и задумано (п.5 промпта).
+- **ИТОГ ТРИПТИХА: фазы A/B/C «Категории v2» + staging + prod — полностью выполнены и верифицированы за 2026-07-14.** Git: `14f438b` / `58d43dd`; prod live (DEP-022…024).
+
+### Категории v2 — оставшиеся фазы (план, НЕ путать с глобальной «Фазой D» админки / Sheets cutover)
+
+> **Именование:** «**Категории v2 фаза D/E**» — только реорганизация каталога и hotspot-вдохновение. Глобальная **Фаза D** (CRM «Каталог», migration 018, Sheets cutover) — **закрыта** 2026-07-14.
+
+| Фаза | Скоуп | Оценка | Статус |
+|------|--------|--------|--------|
+| **A/B/C** | Подкатегории-сущности, виртуальная Распродажа, specs, giftGuide | 3 сессии | ✅ done + staging-verified |
+| **D (Cat v2)** | **Реорганизация админки:** единый раздел «Каталог и разделы» | ~1–2 сессии | ✅ done + merged (`0482f00`) |
+| **E1 (Cat v2)** | Миграция `026`, CRM/public hotspot API | ~1 сессия | ✅ done + merged |
+| **E2 (Cat v2)** | Admin `HotspotEditor` | ~1 сессия | ✅ done + merged |
+| **E3 (Cat v2)** | Storefront hero + hotspots + ProductGrid | ~1 сессия | ✅ done + merged (`34b67bb`) |
+| **F1/G1–G3/H1** | Aspect fix, cover/banner, popover, index cards | follow-ups | ✅ done + merged |
+
+**Порядок:** D → E. **Деплой:** миграция → backend → admin → storefront (аддитивно).
+
+### Cat v2 D+E — merged + prod (2026-07-15)
+
+**Git канон:** `origin/master`=`0482f00`, `origin/main`=`34b67bb`. Feature-ветки смержены FF.
+
+**VPS (до checkout):** `/var/www/muru` на `feature/crm-categories-e`; `/var/www/muru-storefront` на `feature/inspiration-hotspots` — SHA совпадают с каноном. **Следующий шаг:** `git checkout master/main` на VPS (тривиально).
+
+**Откат кода:** backend `14f438b`, storefront `58d43dd`. Backup: `muru_db_pre_cat_v2_de_2026-07-15_0613.dump`.
 
 ## Cutover (операционный, 2026-07-14) — ВЫПОЛНЕН
 
@@ -324,12 +426,21 @@
 | DEP-019 | Hotfix O-1+O-3: maintenance unless no initData (web OK); admin create product | `muru-backend-local` / `master` (`23edcaa`) | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh` OK; `/api/health` 200; `/api/catalog/tree` без initData → 200 | vitest 62/321 |
 | DEP-020 | Hotfix O-2+O-4: storefront `/img/` proxy + category covers | `muru-storefront` / `main` (`04d5222`) | verified | **deployed** (Василий, 2026-07-14) | recovery `npm ci --include=dev` → build → restart | curl `/catalog/`: 8× cover via `murushop.ru/img/`; smoke O-4/6 ✅ |
 | DEP-021 | Hotfix O-5: admin CRM photo preview on re-edit | `muru-backend-local` / `master` (`cf5c0a3`) | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh` OK; admin rebuild | `productToImageSlots` → `/img/crm_*/600.webp` |
+| DEP-022 | **Категории v2:** миграции `020`–`025` на prod-БД | `muru-backend-local` / `master` (`14f438b`) | verified | **deployed** (Василий, 2026-07-14) | — | Prod: 17/242 links, 13 junk del, 18 SKU из Sale; backup `...1619.dump` 107K |
+| DEP-023 | **Категории v2:** backend + admin @ `14f438b` | `muru-backend-local` / `master` | verified | **deployed** (Василий, 2026-07-14) | `deploy.sh`; PM2 ↺139 | API smoke 5/5 + login 409 guard |
+| DEP-024 | **Категории v2:** storefront `giftGuide` @ `58d43dd` | `muru-storefront` / `main` | verified | **deployed** (Василий, 2026-07-14) | FF `04d5222→58d43dd`; build 28/28 | `web.murushop.ru/gifts/` 200 |
+| DEP-025 | **Follow-up (опц.):** admin cover preview + subcategory sort | `muru-backend-local` / `master` | not started | — | после прода или hotfix | Preview: `proxyPath` в `CategoriesPage`; sort: swap при equal `sort_order` |
+| DEP-026 | **Cat v2 D+E:** миграция `026` + backend/admin + storefront E3 | `feature/*` → **merged** `master`/`main` | verified | **deployed** | psql 026; DEP-026 smoke | merged @ `0482f00`/`34b67bb` |
+| DEP-027 | **Inspiration G1–G3:** migration `027` + cover/banner + popover | merged | verified | **deployed** | psql 027; browser smoke OK | manual cover+banner per lookbook |
+| DEP-028 | **H1:** compact square lookbook index cards | `34b67bb` on `main` | verified | **deployed** | storefront rebuild | `aspect-square`, `max-w-[1140px]` |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
 ## Бэклог (не терять)
 - Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко. **+ cutover 2026-07-14:** топ-категории на `web.murushop.ru` — `adaptTree()` не мапит `coverImageUrl`; CRM-фото товаров на витрине — нужен `/img/` proxy как в mini app.
-- **Admin create product:** ~~route `products/new` bug~~ ✅ fix verified (`isNew = !id || id === 'new'`), DEP-019 pending deploy.
+- **Admin create product:** ~~route `products/new` bug~~ ✅ fix verified (`isNew = !id || id === 'new'`), DEP-019 deployed.
+- **Категории v2 admin follow-up:** preview обложек категорий/подкатегорий в `CategoriesPage` (raw Drive/CRM URL → `/img/`); ↑↓ reorder не меняет порядок, если все `sort_order=0` после бэкфилла (DEP-025).
+- **Пустые подкатегории в публичном дереве:** принято на staging-smoke — **оставляем** (решение A); фильтр пустых — отдельная правка по запросу.
 - ~~Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).~~ ✅ ЗАКРЫТО 2026-07-06 (унификация U1-U4, `MURU_miniAPP` заморожен `7877be1`, прод на каноне DEP-008).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
 - CDEK debug-урок для памяти: ранний симптом «расчёт цены не приходит» (сессия 2026-07-02) свёлся к пустым CDEK-кредам в `.env` на момент теста — сам расчётный код был исправен с самого начала. Перед глубоким дебагом смотреть `.env` в первую очередь.
@@ -341,7 +452,38 @@
 ## Крупное расширение скоупа
 Заказчик прислал рецензию ТЗ + Арина 6 пунктов маркетинга (30.06.2026). Это **отдельный оплачиваемый этап, НЕ входит в 470k v1**. Детали и триаж — в `SPEC.md` → блок v0.2.
 
+## Фаза: Admin Design System (редизайн CRM admin/)
+
+**Старт:** 2026-07-15. **Репо:** `muru-backend-local`, ветка `feature/admin-design-system` от `master` (`0482f00`). **Скоуп:** только `admin/`; backend не трогаем. **Деплой:** нет до отдельного решения.
+
+| Фаза | Статус |
+|------|--------|
+| UI-1 Foundation (tokens, ui kit, layout, login) | ✅ verified `946ff15` |
+| UI-2 Catalog + data components | ✅ verified `f44f04c` |
+| UI-2.1 Subcategory CSS + sr-only | ✅ verified `58dfb4f` |
+| UI-3 Orders/Content/Inspiration/Dashboard | ✅ verified `d5a3814` |
+| UI-3.1 Hotspot CSS + quiet drag toast | ✅ verified `539a075` |
+| UI-4 Polish + DESIGN.md | ✅ verified `bcc4be7` |
+
+**ИТОГ:** design system **COMPLETE** на ветке (6 коммитов от `946ff15`). Legacy `styles.css`/`pages.css` удалены; CSS chain `tokens→base→components→index` (1525 строк); `admin/DESIGN.md` + ссылка в `55-executor.mdc`. `lib/*-api.ts` без диффа (только `cn.ts`). Forward-port не нужен. Деплой — после merge.
+
 ## Лог сессий
+- **2026-07-15 (сессия 25)**: **Admin Design System UI-4 verified — фаза COMPLETE.** `@ bcc4be7`: удалены `styles.css`/`pages.css` (−1075 строк net); живые правила в `components.css`; RichTextEditor → `SkeletonText`; ProductsListPage → `filters-panel`; WCAG fix `.orders-status-tab--active` (olive bg + white text); `prefers-reduced-motion` guard в base + tab underline + spinners/shimmer. Оркестратор: `tsc -b`+`build` OK; confirm/alert/prompt=0; hex только tokens; legacy classes=0; diff scope `admin/**`+`55-executor.mdc`. Manual smoke не прогонялся. Следующее: решение о merge → deploy.
+- **2026-07-15 (сессия 24b)**: **Admin Design System UI-3.1 verified.** `@ 539a075`: удалены дубли hotspot/tiptap из pages.css (accent marker живёт в components.css); drag-save без success toast. `tsc`+`build` OK. Следующее: UI-4.
+- **2026-07-15 (сессия 24)**: **Admin Design System UI-3 verified.** `@ d5a3814`: PromptProvider, orders/content/dashboard/hotspot/RichTextEditor; confirm/alert/prompt=0; file inputs only ui-kit; lib без диффа. Находки: `pages.css` переопределяет `.hotspot-marker` (accent→dark gray); drag-end toast шумный. Следующее: UI-3.1 → UI-4.
+- **2026-07-15 (сессия 23b)**: **Admin Design System UI-2.1 verified.** `@ 58dfb4f`: BEM `catalog-subcategory-order__*` aligned TSX↔CSS; `.sr-only` in base.css. Diff: 2 CSS files only; `tsc`+`build` OK. Следующее: UI-3.
+- **2026-07-15 (сессия 23)**: **Admin Design System UI-2 verified.** `@ f44f04c`: Table/Skeleton/EmptyState/PageHeader/Toast/Confirm/ImageUploader/FileDropzone; App providers; catalog+sections pages на новой системе; ProductEdit subcategory grouped Cards + ★ Star; API libs без диффа; confirm в catalog/sections=0. Оркестратор: `tsc`+`build` OK; находки (не блокеры): BEM mismatch ProductEdit subcategory order (`__row` vs `-row` в CSS), `.sr-only` не в base.css; Lookbooks delete без toast. Следующее: UI-3.
+- **2026-07-15 (сессия 22)**: **Admin Design System UI-1 verified.** Ветка `feature/admin-design-system` @ `946ff15`: CSS split (`styles/tokens|base|components|pages`), ui kit (Button/Field/Input/Checkbox/Badge/Card/Tabs), ProtectedLayout+CatalogLayout+ContentLayout+LoginPage, `lucide-react`. Оркестратор: `tsc -b`+`build` OK, hex только в `tokens.css`, `lib/*-api.ts` без диффа (только новый `cn.ts`). Следующее: UI-2.
+- **2026-07-15 (сессия 21)**: **FF-merge Cat v2 D+E в канон.** `feature/crm-categories-e`→`master` (`14f438b`→`0482f00`, push OK); `feature/inspiration-hotspots`→`main` (`58d43dd`→`34b67bb`, push OK). PROGRESS: D/E→Сделано, DEP-027/028 deployed. **VPS checkout (Василий):** backend FF `14f438b`→`0482f00` on `master`, storefront FF `58d43dd`→`34b67bb` on `main`; `banner_image` в `content_lookbooks` — есть; curl 4×200. **Pending:** mini app regression smoke. G1 backend `d5c9a3e` (migration 027, `banner_image`, vitest 361/361). G2 admin `0482f00` (Обложка/Баннер, галерея убрана, hotspots на banner). G3 storefront (uncommitted): portal popover flip, `banner??cover`, gallery removed, `typecheck`+`build` 28/28. F1 `3499101` pushed ранее. **Следующее:** commit+push G3 + backend G1/G2 → VPS DEP-027.
+- **2026-07-15 (сессия 20)**: **DEP-026 deployed на prod.** Backend/admin `84a78d3` (миграция 026, backup 114K); storefront `d028b74` build 26/26, PM2 ↺40. Smoke: CRM+public hotspots API; live HTML hero+«Предметы на фото»+MU0150 на `web.murushop.ru/lookbooks/vaupaupau/`. Build-warn CMS 404 → static fallback (не регрессия). Следующее: merge в master/main, браузерный клик по маркеру, mini app regression.
+- **2026-07-15 (сессия 19, продолжение)**: **Cat v2 E3 storefront verified.** `feature/inspiration-hotspots` @ `d028b74`: hero hotspots, popover, ProductGrid hydration, generateStaticParams API+fallback. Оркестратор: `tsc`+`build` 28/28. **ИТОГ Cat v2 D+E: dev-verified, not deployed.** Commits: `d1af333` D, `9aeeb5a` E1, `84a78d3` E2, `d028b74` E3. Следующее: совместный smoke → DEP-026.
+- **2026-07-15 (сессия 19)**: **Cat v2 D+E1+E2 dev-verified.** D: admin «Каталог и разделы» (`d1af333`) — hub, CategoryDetail, GiftGuide, redirects. E1: migration 026 + hotspot API (`9aeeb5a`), vitest 355. E2: `HotspotEditor` (`84a78d3`), tsc OK. Ручной admin smoke отложен (нет 017+026 на `muru_local`). Follow-up E3: `discountPercent`/`oldPrice` в public hotspot product DTO; CRM hotspot N+1 `getProduct`. Следующее: E3 storefront.
+- **2026-07-14 (сессия 18)**: **Prod-cutover «Категории v2» DEP-022…024 deployed.** Pre-check prod `muru_db`: web_sub=243/sub=0, 18 SKU в Sale, virtual Sale=20. Backup `muru_db_pre_categories_v2_2026-07-14_1619.dump` (107K). FF pull `cf5c0a3→14f438b`; миграции 020–025 (13 junk, 18 reassigned, 17/242 subcats); `deploy.sh` PM2 ↺139; API smoke green (Sale 20, tree 17, login 200, guard 409). Storefront FF `04d5222→58d43dd`, build 28/28, `/gifts/` 200. DEP-025 optional остаётся.
+- **2026-07-14 (сессия 17)**: **Категории v2 staging-verified, STOP перед продом.**
+- **2026-07-14 (сессия 16)**: **Push+merge выполнены оркестратором напрямую** (проверил доступ: GitHub reachable, SSH до staging VPS — `Permission denied`, значит staging только руками Василия). `git push` 3 веток `feature/crm-categories-*`, FF-merge `-c → master` (`cf5c0a3→14f438b`, 26 файлов, чисто), `git push origin master` + `git push origin main` (storefront). Гейт подтверждён: `origin/master`==`local master`==`14f438b`. Подготовлен runbook для Василия: миграции 020–025 на staging + деплой + смоук-чеклист (12 пунктов из промпта пользователя) — прод остаётся untouched, STOP-гейт после staging.
+- **2026-07-14 (сессия 15)**: **Фаза C verified + принята.** Отчёт исполнителя явно оставил 3 ключевые ручные проверки невыполненными («осталось в UI») — оркестратор не поверил на слово, прогнал их сам напрямую через реальный CRM API на `muru_local` (сброс пароля owner, логин, PATCH с телом, идентичным реальной форме): консолидация `Страна→Страна производитель`, сохранность легаси-ключей specs (`Плотность ткани`), удаление `Тип` без подкатегории, `isGiftGuide` фильтр в обоих API, живой `/gifts/` через `next dev` — всё подтвердилось на 100%. `tsc`×3/`vitest` (345/345)/`next build` — чисто. Закоммитил `14f438b` (backend/admin, `feature/crm-categories-c`) и `58d43dd` (storefront, `main`, без push, с явным подтверждением пользователя перед коммитом в чужой main). **Триптих A/B/C завершён.** Следующий шаг — решить порядок merge веток `feature/crm-categories-*` в `master` и план деплоя (staging сначала, миграции 020–025).
+- **2026-07-14 (сессия 14)**: **Фаза B verified + исправлена.** Промпт фазы B выполнен в `feature/crm-categories-b`. Оркестратор нашёл критичную проблему бэкфилла (миграция 024 источником указывала пустое `web_subcategory_name`, реальные данные — в легаси `subcategory`, 243/265 товаров) прямым SQL-запросом к `muru_local` — согласовал с Василием фикс на `COALESCE`, переписал миграцию 024 сам, применил к `muru_local` (16 подкатегорий/243 связки), подтвердил идемпотентность и живым curl `/api/catalog/tree?subcategories=1`. Полная верификация диффов (19 файлов)/`tsc`×2/`vitest` (341/341). Закоммитил (`f9e2327`, без push/merge). Следующий шаг — промпт фазы C (характеристики + «Гид по подаркам»).
+- **2026-07-14 (сессия 13)**: Старт фазы «Категории v2» (A/B/C, реструктуризация категорий/подкатегорий CRM). Промпт фазы A выдан и выполнен в `muru-backend-local` (`feature/crm-categories-a`). Оркестратор независимо верифицировал: диффы, `tsc` x2, `vitest` 332/332 (изолировано от сетевого шума сэндбокса), реальные SQL-запросы к `muru_local`, живые curl к `/api/catalog/tree`/`products`. Добавил и согласовал с Василием 2 доп. гварда (защита виртуальной «Распродажа» от удаления/переименования через CRM), не входивших в исходное ТЗ. Закоммитил фазу A (`dc04b70`, без push/merge). Следующий шаг — промпт фазы B (подкатегории-сущности).
 - **2026-07-14 (сессия 9)**: **Hotfix verified (2026-07-14-03 + storefront O-2/O-4).** Backend: O-3 `isNew` fix; O-1 `miniappMaintenanceUnlessNoTelegramInitData` on catalog/cdek; vitest **62/321** (оркестратор). Storefront: `resolveCatalogImageUrl`, `adaptTree` coverImageUrl; tsc OK. Commit/deploy pending → DEP-019, DEP-020.
 - **2026-07-14 (сессия 10)**: **Deploy verify.** DEP-019 **deployed** @ `23edcaa`. DEP-020 **failed** build → 502; fix `npm ci --include=dev` (DEPLOY.md).
 - **2026-07-14 (сессия 11)**: **Storefront recovery + post-deploy smoke.** DEP-020 **deployed** after recovery; `web.murushop.ru` 200. Smoke: CRM фото/описание на web ✅; create product ✅; O-4/6 covers ✅; `MINIAPP_MAINTENANCE=true` ещё не снят.
