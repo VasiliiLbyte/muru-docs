@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-15 (Admin Design System **COMPLETE** @ `bcc4be7`; merge/deploy — отдельное решение)
+Последнее обновление: 2026-07-21 (сессия 39 CLOSE: Phase C2 users DEP-043 deployed prod)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -91,16 +91,47 @@
   - **G3** (`4383933`): storefront banner, portal popover flip, gallery removed.
   - **H1** (`34b67bb`): compact square cards на `/lookbooks/`.
   - **Prod:** DEP-026/027/028 deployed; browser smoke OK. **Merge:** FF `feature/crm-categories-e`→`master`, `feature/inspiration-hotspots`→`main` (сессия 21). **VPS checkout:** `/var/www/muru`→`master`=`0482f00`, `/var/www/muru-storefront`→`main`=`34b67bb`, migration `027` (`banner_image`) — OK; curl smoke 4×200. **Pending:** mini app regression smoke.
+- **Storefront: «Распродажа» на web — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-15** (промпт `2026-07-15-01`, `muru-storefront`): `onSale` filter, redirect `rasprodazha→распродажа`, footer/taxonomy. DEP-029 deployed; browser smoke Василия — листинг со скидками OK (стр. 1 из 3).
+- **Virtual Sale CRM/admin — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-15** (промпт `2026-07-15-02`, `@ d99d21a`): DEP-030 deployed (browser: count 21 по скидке).
+- **Sale category detail UX — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-15** (промпт `2026-07-15-03`, `@ a755022`, **не pushed**): `CategoryDetailPage` — cover edit для Sale (`canEditCover`, patch cover only), Card «Товары» (search, pagination, link → product). Verify: diff 1 файл OK; admin `tsc -b`+`build` OK. Deploy → DEP-031.
+- **Storefront images IMG-1/2/3 — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (`muru-storefront/main` @ `f6655ba`): custom next/image loader (320/600/1200 presets), contextual sizes, scroll-snap карусель в product-card. VPS `web.murushop.ru` smoke 200.
+- **Backend image-proxy quality — ВЫПОЛНЕН и ЗАДЕПЛОЕН 2026-07-16** (`muru-backend-local/master` @ `a1ae181`): `QUALITY_BY_WIDTH` (320 q82, 600 q88, 1200 webp q92); vitest 368/368. **Cache purge на проде — не закрыт:** старые q82-варианты (~16 628 B) всё ещё отдаются из `IMAGE_CACHE_DIR`; smoke «54K» был на одном URL после miss, не подтверждает полный purge. См. «Следующее» → image cache purge.
+- **Storefront home hero → CMS only — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-01`, DEP-032): удалён хардкод `<Hero />`; баннеры только из CMS; «Лето в доме» создан в admin. Live на `web.murushop.ru`.
+- **Home banners full-viewport + scroll-snap — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпты `2026-07-16-02` + `02b`/`02c`/`02d`, `e26f06c`): высота `100dvh − offset`; desktop mandatory snap; origin на utility; футер-слайд; mobile без snap. DEP-033 deployed.
+- **Catalog/PDP visual (квадраты + specs) — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-03`, в `57bfce2`): category-grid 1:1 / 4 cols; PDP gallery square; наличие; specs accordion + артикул; adaptProduct specs.
+- **Buy in 1 click — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-04`, в `57bfce2`): shared `useWebDelivery` + `WebDeliveryFields`; `OneClickBuyDialog` → CDEK + ЮKassa; return `clearCart` только если source≠one-click.
+- **PDP Размер из dimensionsLabel — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-05`, `@ 655bb5d`): adaptProduct → specs['Размер'].
+- **Admin поле «Цвет» — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-06`, `@ c873747` на `origin/master`): dual-write color + specs['Цвет'].
+- **Landings index square grid — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-07`, `@ 44401e7`).
+- **Landings detail: no hero, center title, 3-col — ВЫПОЛНЕН 2026-07-16** (промпт `2026-07-16-08`, `@ 94d7ebd`).
+- **CMS `hero_image` на content_pages — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-09`, `@ c5bc0d5`): migration `028` на VPS; DEP-036.
+- **Контакты/Клиентам visual + CMS — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпты `2026-07-16-10` + `10b`, `@ 1db2365`): contacts/help visual; DEP-037.
+- **Admin fixed tabs Клиентам/Контакты — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-11`, `@ 27256b2`, **ahead origin**): убрана вкладка «Страницы»; GET/PUT `pages/by-slug/:slug` allowlist help|contacts; FixedPageEditPage. Verify: tsc + service tests OK; route 401 = sandbox EPERM.
+
+**Storefront tip:** `origin/main` = `1db2365`. **Backend tip:** local `master` = `27256b2` (origin ≥ `c5bc0d5`).
 
 ## Следующее
-- **Admin Design System merge:** FF `feature/admin-design-system` → `master` (`bcc4be7`, 6 коммитов UI-1…UI-4) — по решению Василия; затем деплой admin bundle (`deploy.sh`, без миграций). **Manual smoke до merge (рекомендуется):** login → dashboard → products (filters+table) → product edit (★+toast) → order confirm → TipTap prompt → hotspot drag → DevTools `prefers-reduced-motion`.
-- **Mini App regression smoke (обязательно):** каталог → корзина → checkout TG после merge; записать PASS/FAIL в PROGRESS.
-- **Контент вдохновения:** в admin — отдельно обложка (сетка) и баннер (hotspot'ы) для каждого лукбука.
-- **Follow-up (не блокеры):** HTML description на storefront; стиль маркеров hotspot; DEP-025 admin preview covers.
-- **Follow-up (DEP-025, опц.):** admin preview обложек категорий/подкатегорий через `/img/`; ↑↓ порядок подкатегорий при `sort_order=0`.
-- **Боевая валидация** (§4 `CUTOVER.md`): ~30 товаров через CRM; freeze Sheets с клиентом (п.6).
-- **Hotfix follow-up:** ~~O-1..O-5~~ ✅ DEP-019/020/021 deployed. Open: `MINIAPP_MAINTENANCE=false`, cutover §3.8 TG sync 423.
-- **Операционно:** пре-чеклист п.8 (`backend/.env` → `.unused`); подтвердить п.8 смоука (TG sync 423).
+
+### Phase C2 (users) — ЗАКРЫТО
+`ca40542` на prod `/var/www/muru` (DEP-043). Миграций нет. Василий: smoke OK.
+
+**Процессное отклонение:** staging STOP-гейт пропущен — деплой сразу на prod (оператор подтвердил работоспособность).
+
+### Кандидаты на следующее задание (решает надзор)
+1. **Image cache purge (q82)** — ops, если ещё не закрыт (надзор 2026-07-21).
+2. **Остальные «Настройки» SPEC §12** — реквизиты / СДЭК / ЮКасса / SEO / юрдоки / уведомления (плейсхолдеры «скоро» в Settings hub).
+3. **Follow-up витрины:** HTML description; стиль маркеров hotspot; DEP-025 admin preview covers; 2-й consent в 1-клик.
+4. **Ops backlog:** confirm VPS SHA polish/`fix/admin-ui-polish`; Mini App regression smoke (висит с DEP-026).
+5. **CRM дальше по SPEC:** Клиенты / Склад / роли «кладовщик» — крупнее, отдельный эпик.
+
+### Follow-up (не блокеры)
+- ~~Вкладка «О нас»~~ → DEP-039 closed.
+- ~~CMS «Вакансии»~~ → DEP-040 closed.
+- ~~CMS «Партнёры» hero-only~~ → DEP-041 closed.
+- ~~Company hero parity~~ → DEP-042 closed.
+- ~~Phase C2 admin users~~ → DEP-043 closed.
+- HTML description на storefront; стиль маркеров hotspot; DEP-025 admin preview covers; 2-й consent в 1-клик — опц.
+- Image cache purge (q82) — если ещё не закрыт.
 
 ## Фаза: Категории v2 (A/B/C — реструктуризация категорий/подкатегорий CRM)
 
@@ -433,6 +464,21 @@
 | DEP-026 | **Cat v2 D+E:** миграция `026` + backend/admin + storefront E3 | `feature/*` → **merged** `master`/`main` | verified | **deployed** | psql 026; DEP-026 smoke | merged @ `0482f00`/`34b67bb` |
 | DEP-027 | **Inspiration G1–G3:** migration `027` + cover/banner + popover | merged | verified | **deployed** | psql 027; browser smoke OK | manual cover+banner per lookbook |
 | DEP-028 | **H1:** compact square lookbook index cards | `34b67bb` on `main` | verified | **deployed** | storefront rebuild | `aspect-square`, `max-w-[1140px]` |
+| DEP-029 | **Hotfix:** web «Распродажа» — `onSale` filter + slug redirect | `muru-storefront` / `main` | verified | **deployed** (Василий, 2026-07-15) | PM2 rebuild storefront | browser smoke: листинг 3 стр., скидки OK |
+| DEP-030 | **Virtual Sale CRM:** filter + virtual count + no subcategories | `muru-backend-local` / `master` (`d99d21a`) | verified | **deployed** (Василий, 2026-07-15) | `deploy.sh` | browser: 21 по скидке |
+| DEP-031 | **Sale detail UX:** cover edit + products table | `muru-backend-local` / `master` (`a755022`) | verified | — | push → `deploy.sh` | admin-only; 1 commit ahead origin |
+| DEP-032 | **Home hero CMS-only:** убрать хардкод `Hero`, баннеры только из API | `muru-storefront` / `main` | verified | **deployed** (Василий, 2026-07-16) | — | CMS «Лето в доме» live |
+| DEP-033 | **Home full-viewport banners + mandatory snap + footer slide** | `muru-storefront` / `main` (`e26f06c`) | verified | **deployed** (Василий, 2026-07-16) | — | `02d` origin на utility; smoke OK |
+| DEP-034 | **Storefront visual epic** (PDP/1-click/landings/size map) | `muru-storefront` / `main` (`94d7ebd`) | verified | **confirm VPS** | `git pull` + build + restart | tip `94d7ebd`; smoke 1-click + landings |
+| DEP-035 | **Admin «Цвет» в характеристиках** | `muru-backend-local` / `master` (`c873747`) | verified | **confirm VPS** | `deploy.sh` admin | fill Цвет in CRM for posters |
+| DEP-036 | **CMS pages `hero_image`** (migration `028` + admin upload) | `muru-backend-local` / `master` (`c5bc0d5`) | verified | **deployed** (2026-07-16) | — | psql 028 OK; VPS tip was c5bc0d5 |
+| DEP-037 | **Contacts/Help visual + CMS hero** | `muru-storefront` / `main` (`1db2365`) | verified | **deployed** (2026-07-16) | — | build OK; 502 был гонка restart |
+| DEP-038 | **Admin fixed tabs Клиентам/Контакты** (by-slug upsert) | `muru-backend-local` / `master` (`27256b2`) | verified | **deployed** (2026-07-21) | — | deploy.sh OK |
+| DEP-039 | **CMS «О нас» + vacancy/partners** (migration 029, sections JSONB) | backend `a761aae`; storefront tip `2a55869` (cards 1:1) | verified | **deployed** (backend + storefront; visual QA vs muru.ru OK) | — | hero+promo 16:9; cards Mulish 300 / gap 128 / #6B6B6B; routes vacancy/partners |
+| DEP-040 | **CMS «Вакансии» full** (Zod + admin repeatable + storefront accordion parity) | backend `ee5ef9f`; storefront ≥ visual-fix | verified | **deployed** (2026-07-21) | — | без миграций; крошки через CMS title |
+| DEP-041 | **CMS «Партнёры» hero-only** (sections + admin + storefront card; без 2 инфо-блоков) | backend `268fc03`; storefront `9e6ee74` | verified | **deployed** (2026-07-21) | — | title=крошки; hero.heading+text; нет double body |
+| DEP-042 | **Company hero card parity** (700px / font_24 / intrinsic photo) | `muru-storefront` / `main` | verified | **deployed** (2026-07-21) | — | only `CompanyHeroSection`; mission/promo untouched |
+| DEP-043 | **Phase C2: CRM users** — `/api/crm/users` + admin Settings→Users (owner-only) | `muru-backend-local` (`ca40542`) | verified | **deployed** (2026-07-21, prod `/var/www/muru`; staging STOP skipped) | `deploy.sh`, no migration | operator smoke OK |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -448,6 +494,7 @@
 - `getProducts` витрины тянет весь каталог и фильтрует в Node — ок до ~1000 SKU, дальше серверные query-параметры.
 - Конвенция: `schema.sql` держим синхронным с миграциями в обоих backend-репо.
 - `sitemap.xml` при билде без API — отдельный fallback (follow-up из 2026-07-04-02; `catalog-menu` уже fixed).
+- **Image cache purge на проде:** после деплоя `a1ae181` старые q82-варианты в `IMAGE_CACHE_DIR` всё ещё отдаются; purge обязателен (читать путь из `/var/www/muru/.env`, не `backend/.env`).
 
 ## Крупное расширение скоупа
 Заказчик прислал рецензию ТЗ + Арина 6 пунктов маркетинга (30.06.2026). Это **отдельный оплачиваемый этап, НЕ входит в 470k v1**. Детали и триаж — в `SPEC.md` → блок v0.2.
@@ -467,7 +514,45 @@
 
 **ИТОГ:** design system **COMPLETE** на ветке (6 коммитов от `946ff15`). Legacy `styles.css`/`pages.css` удалены; CSS chain `tokens→base→components→index` (1525 строк); `admin/DESIGN.md` + ссылка в `55-executor.mdc`. `lib/*-api.ts` без диффа (только `cn.ts`). Forward-port не нужен. Деплой — после merge.
 
+### Follow-up: Admin UI polish (2026-07-15)
+
+**Ветка:** `fix/admin-ui-polish` от `master` (`bcc4be7`). **Скоуп:** admin UX + minor backend sort API.
+
+| Шаг | Статус |
+|-----|--------|
+| UI-5a layout/filters/select/checkbox | ✅ verified `bc392bb` |
+| UI-5b products sort (backend+admin) | ✅ verified `70f86f4` |
+
+**Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
+
 ## Лог сессий
+- **2026-07-21 (сессия 39 CLOSE, Phase C2):** DEP-043 **deployed** prod `/var/www/muru` — оператор: «всё работает». SHA **`ca40542`**. Staging STOP пропущен (осознанно). Эпик users закрыт. Handoff → надзорный оркестратор (отчёт в чате сессии 39).
+- **2026-07-21 (сессия 39, Phase C2 commit):** A+B committed `ca40542` on `feature/admin-users`. DEP-043 pending. Next: push → staging smoke → FF master → prod `deploy.sh`.
+- **2026-07-21 (сессия 39, Phase C2 B ACCEPT):** **ACCEPT `2026-07-21-22-admin`** — Settings hub + Users page; owner NavLink; RequireOwner redirect; self/last-owner UI guards; password reset self OK; email-match (без `/me` id); `apiFetchNoContent` для DELETE 204. Verify: `tsc -b` + `vite build` clean. Backend A не тронут. **Next:** commit A+B → staging smoke → FF/prod DEP.
+- **2026-07-21 (сессия 39, Phase C2 A ACCEPT):** **ACCEPT `2026-07-21-21-be`** — CRM users API на `feature/admin-users` (uncommitted, base `268fc03`). Verify: tsc clean; vitest users 22/22 (+ executor full 433/433); миграций нет; manager→403; last-owner/self demote|deactivate|delete→409; duplicate→409; short pwd→422; password reset API разрешён и для себя. Выдан **`2026-07-21-22-admin`**. Решение UI: reset своего пароля **разрешён**; demote/deactivate/delete себя — блокировать.
+- **2026-07-21 (сессия 39, Phase C2 start):** Принят роадмап owner-only users (backend+admin SPA). Visual parity muru.ru **не** применяется. Порядок A→B. Выдан executor prompt **`2026-07-21-21-be`** (CRM users API). Prompt B — после ACCEPT A.
+- **2026-07-21 (сессия 38b):** **ACCEPT `20-company-hero`** + deploy — hero «О нас» 1:1 с muru.ru. DEP-042 **deployed**.
+- **2026-07-21 (сессия 38, CLOSE vacancy+partners):** Полный отчёт ниже. **Vacancy** `12-be`→`16-visual-fix` → DEP-040 deployed (`ee5ef9f` + SF visual). **Partners** `18-be`→`19-fe` → DEP-041 deployed (backend **`268fc03`**, storefront **`9e6ee74`**). Уроки: HelpHero+двойной body; title≠hero.heading; visual parity по intrinsic/CSS; крошки через CMS title без хардкода. Миграций нет. muru-docs PROGRESS обновлён (этот лог).
+- **2026-07-21 (сессия 37b, vacancy CLOSE):** Visual-fix ACCEPT (`16`); крошки «Вакансии» — через admin `page.title` (промпт `17-crumb` отменён). DEP-040 **deployed**. Эпик vacancy закрыт.
+- **2026-07-21 (сессия 37, CMS vacancy):** **ACCEPT** цепочки `12-be` → `13-admin` → `14-fe` → `15-visual`. Backend+admin: Zod/upsert/mapper + VacancyPageEditPage/repeatable; storefront: sections render + visual parity (hero card −75px/700px, HR borders, accordion boxed+brand, resume btn 38px/#5D6B3A). Миграций нет. Ветки `feature/cms-vacancy-sections` **uncommitted**. DEP-040 pending commit→FF merge→deploy. Honest gaps: Aspro typography scale, mobile −75px overlap.
+- **2026-07-21 (сессия 36f, CMS company CLOSE):** Visual parity `/company/` vs muru.ru **ACCEPT** пользователем. Цепочка: `09` square (ошибочно) → `10` aspect-video 16:9 (фото OK) → `11-cards` typography/spacing 1:1 из company.min.css. Storefront tip **`2a55869`** on `main`; backend **`a761aae`**. DEP-039 → **deployed**. Урок: не доверять CDP height без проверки intrinsic размеров ассетов (bg3 = 1920×1080, не квадрат).
+- **2026-07-21 (сессия 36e, promo 16:9):** Скачаны оригиналы muru.ru: `bg1.webp`/`bg3.webp` оба **1920×1080** — прежнее CDP-измерение «квадрат» ошибочно; квадратный контейнер зумил фото ×1.78. **ACCEPT `2026-07-21-10-visual`** @ `94af2cd`: hero+promo → `aspect-video`. **ACCEPT `2026-07-21-11-cards`** @ `2a55869`: карточки по CSS оригинала (gap 128, font-light #6B6B6B/#5B5B5B, btn 38px/#5D6B3A).
+- **2026-07-21 (сессия 36d, promo square):** **ACCEPT `2026-07-21-09-visual`** — `CompanyPromoSection`: `aspect-square` + absolute-centered cards `max-w-[370px] min-h-[307px] gap-5 p-6`; убран `min-h-[70/80vh]`. Deployed @ `6cbe4c8`, но визуально промо стало ×2 выше оригинала → супersede промптом `10-visual`.
+- **2026-07-21 (сессия 36, CMS company):** **ACCEPT `2026-07-21-01-be`** (backend+admin, uncommitted → committed). **ACCEPT `2026-07-21-02-fe`** @ `7420154` + **ACCEPT `2026-07-21-03-fix`** (contract alignment: `backgroundImage→image`, `body→text`, `description→text`, +`key`); tsc OK×3. DEP-039 ready: commit fix → FF merge both branches → psql 029 → deploy. (uncommitted @ `feature/cms-company-sections`, 17 файлов). Verify оркестратора: tsc backend OK, vitest **393/393**, admin tsc+build OK; diff scope чистый (no frontend/admin routes/payments). Migration 029 SQL идемпотентен; local psql не прогонялся (нет content_pages — ок). Следующее: commit → промпт `2026-07-21-02-fe` storefront.
+- **2026-07-21 (надзор → оркестратор):** принят порядок одной VPS-сессии: confirm SHA → backend deploy `27256b2` (DEP-031/035/038+polish) → storefront deploy или confirm → **image cache purge** (`IMAGE_CACHE_DIR` из `/var/www/muru/.env`) → smoke PASS/FAIL → контент admin. `muru-docs` commit — после финальных SHA. PROGRESS обновлён.
+- **2026-07-16 (сессия 35c, fixed content tabs):** **ACCEPT `2026-07-16-11`** `@ 27256b2` — вкладки Клиентам/Контакты вместо CRUD Страницы; by-slug allowlist. DEP-038 pending push+deploy. После деплоя — заполнить фото/текст в admin.
+- **2026-07-16 (сессия 35b, contacts/help FE):** **ACCEPT `2026-07-16-10`+`10b`** `@ 1db2365` deployed. DEP-036/037 deployed.
+- **2026-07-16 (сессия 35, contacts/help CMS):** **ACCEPT `2026-07-16-09`** `@ c5bc0d5` — `hero_image` на `content_pages` (028).
+- **2026-07-16 (сессия 34, visual storefront):** Эпик витрины + admin Color. Промпты `2026-07-16-01`…`08` (+snap hotfixes `02b`–`02d`). **Git:** storefront `origin/main`=`94d7ebd` (hero CMS, full-viewport snap, PDP squares/specs/1-click, landings index+detail); backend `origin/master`=`c873747` (admin Цвет). **Verify:** оркестратор diff+tsc на каждом шаге; snap — browser CDP. **Оператору:** подтвердить VPS SHA (DEP-034/035), smoke 1-click cart isolation, заполнить Цвет в CRM. `muru-docs` PROGRESS обновлён (этот лог).
+- **2026-07-16 (сессия 33)**: **Home snap ACCEPT (`2026-07-16-02`+`02b`).** Full-viewport banners, mandatory snap, `scroll-padding-top`, footer slide. Browser CDP 1440×900: firstFill Δ≈2px; slide2 «Коллекции» + footer `gapBelow=0`, top≈sticky. DEP-033 pending deploy.
+- **2026-07-16 (сессия 32)**: **Home hero CMS-only verified (промпт `2026-07-16-01`).** `page.tsx`: убран `<Hero />`, первый баннер `h1`+`priority`; `hero.tsx` удалён. Оркестратор: diff OK, критерии закрыты. `tsc` OK; `build` sitemap ECONNREFUSED — pre-existing. DEP-032 pending commit/push/deploy. После деплоя: CMS «Лето в доме» `sort_order=0`.
+- **2026-07-16 (сессия 31)**: **Backend image-proxy quality deployed (`a1ae181`).** `QUALITY_BY_WIDTH` в `image-proxy.service.ts`; verify оркестратора: diff 2 файла, tsc OK, vitest 368/368. Василий: push + VPS `deploy.sh`; variant cache на проде пуст (0) — purge не нужен. Smoke `1200.webp` → 200, **54K**. Пара с storefront IMG (f6655ba) — полный цикл качества изображений закрыт.
+- **2026-07-16 (сессия 30b)**: **IMG-3 fix ACCEPT (`f6655ba`).** Убран `pan-y`; edge-стрелки — условный рендер. Оркестратор: diff 1 файл OK, tsc + vitest 3/3. Эпик IMG-1/2/3 закрыт на ветке; merge/push/deploy — отдельно.
+- **2026-07-16 (сессия 30)**: **Storefront IMG-1/2/3 verify.** Ветка `feature/images-quality-and-card-carousel` (`c341df1`/`06d4d4f`/`e5b5b0c`). Оркестратор: tsc OK, vitest 3/3, build 26/26 (prod env override — `.env.local` на localhost ломает build без override). SSR MU0065: нет `/_next/image`, есть 320/600/1200.webp; lookbooks `/uploads` passthrough. Скрины карусели OK. **IMG-1/2 ACCEPT. IMG-3 — нужны 2 фикса** (touch-action pan-y; edge-arrow group-hover). Не push/merge.
+- **2026-07-15 (сессия 29)**: **Sale detail UX verified (промпт `2026-07-15-03`).** `@ a755022`: CategoryDetailPage cover save + products table для Sale. Оркестратор: diff OK, admin build OK. DEP-031 pending push+deploy.
+- **2026-07-15 (сессия 28)**: **Virtual Sale CRM verified (промпт `2026-07-15-02`).** `@ d99d21a`: shared `catalog-sale.helpers`, CRM `buildListFilters` virtual WHERE, categories virtual count, subcategory 409, admin UX. Оркестратор: vitest 54/54, tsc×2 OK. DEP-030 pending push+deploy. DEP-029 storefront deployed (browser smoke OK).
+- **2026-07-15 (сессия 27)**: **Storefront «Распродажа» fix verified (промпт `2026-07-15-01`).** `muru-storefront` uncommitted: `sale-category.ts`, catalog page `onSale: true`, redirect `rasprodazha→распродажа`, footer/taxonomy/mock. Оркестратор: diff OK, `tsc` чисто, prod API 21 SKU + MU0183; prod web ещё пусто/404 (до DEP-029). Build fail на sitemap без бэка — pre-existing. Follow-up: fetch-all → API `categorySlug` (опт.); admin virtual Sale count (опт.).
+- **2026-07-15 (сессия 26)**: **Admin UI polish UI-5a+5b verified.** `@ 70f86f4` (2 коммита на `fix/admin-ui-polish`): UI-5a — sections table height/contrast, centered create category, products filters layout, subcategory Select, select chevron, checkbox wrap fix; UI-5b — `sortBy`/`sortDir` whitelist в `crm-catalog.service`, sortable `TableHead`, vitest 15/15, admin tsc+build OK. `master` уже @ `bcc4be7` (design system). Следующее: FF merge → push → deploy.
 - **2026-07-15 (сессия 25)**: **Admin Design System UI-4 verified — фаза COMPLETE.** `@ bcc4be7`: удалены `styles.css`/`pages.css` (−1075 строк net); живые правила в `components.css`; RichTextEditor → `SkeletonText`; ProductsListPage → `filters-panel`; WCAG fix `.orders-status-tab--active` (olive bg + white text); `prefers-reduced-motion` guard в base + tab underline + spinners/shimmer. Оркестратор: `tsc -b`+`build` OK; confirm/alert/prompt=0; hex только tokens; legacy classes=0; diff scope `admin/**`+`55-executor.mdc`. Manual smoke не прогонялся. Следующее: решение о merge → deploy.
 - **2026-07-15 (сессия 24b)**: **Admin Design System UI-3.1 verified.** `@ 539a075`: удалены дубли hotspot/tiptap из pages.css (accent marker живёт в components.css); drag-save без success toast. `tsc`+`build` OK. Следующее: UI-4.
 - **2026-07-15 (сессия 24)**: **Admin Design System UI-3 verified.** `@ d5a3814`: PromptProvider, orders/content/dashboard/hotspot/RichTextEditor; confirm/alert/prompt=0; file inputs only ui-kit; lib без диффа. Находки: `pages.css` переопределяет `.hotspot-marker` (accent→dark gray); drag-end toast шумный. Следующее: UI-3.1 → UI-4.
