@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-21 (сессия 39 CLOSE: Phase C2 users DEP-043 deployed prod)
+Последнее обновление: 2026-07-22 (сессия 40 CLOSE: collections+new arrivals DEP-044 deployed)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -112,26 +112,24 @@
 
 ## Следующее
 
-### Phase C2 (users) — ЗАКРЫТО
-`ca40542` на prod `/var/www/muru` (DEP-043). Миграций нет. Василий: smoke OK.
+### Активно: —
 
-**Процессное отклонение:** staging STOP-гейт пропущен — деплой сразу на prod (оператор подтвердил работоспособность).
+### Закрыто: Коллекции из карточки + «Новинки» (DEP-044)
+BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: «всё работает» (2026-07-22). Staging STOP пропущен (осознанно, как C2).
 
-### Кандидаты на следующее задание (решает надзор)
-1. **Image cache purge (q82)** — ops, если ещё не закрыт (надзор 2026-07-21).
-2. **Остальные «Настройки» SPEC §12** — реквизиты / СДЭК / ЮКасса / SEO / юрдоки / уведомления (плейсхолдеры «скоро» в Settings hub).
-3. **Follow-up витрины:** HTML description; стиль маркеров hotspot; DEP-025 admin preview covers; 2-й consent в 1-клик.
-4. **Ops backlog:** confirm VPS SHA polish/`fix/admin-ui-polish`; Mini App regression smoke (висит с DEP-026).
-5. **CRM дальше по SPEC:** Клиенты / Склад / роли «кладовщик» — крупнее, отдельный эпик.
+### Кандидаты на следующее (решает надзор)
+1. Image cache purge (q82) — ops backlog.
+2. Остальные «Настройки» SPEC §12 (плейсхолдеры «скоро»).
+3. Витрина follow-up: HTML description; hotspot markers; DEP-025; 2-й consent 1-клик.
+4. Ops: `fix/admin-ui-polish`; Mini App regression smoke.
+5. CRM эпик: Клиенты / Склад / кладовщик.
 
 ### Follow-up (не блокеры)
-- ~~Вкладка «О нас»~~ → DEP-039 closed.
-- ~~CMS «Вакансии»~~ → DEP-040 closed.
-- ~~CMS «Партнёры» hero-only~~ → DEP-041 closed.
-- ~~Company hero parity~~ → DEP-042 closed.
 - ~~Phase C2 admin users~~ → DEP-043 closed.
-- HTML description на storefront; стиль маркеров hotspot; DEP-025 admin preview covers; 2-й consent в 1-клик — опц.
-- Image cache purge (q82) — если ещё не закрыт.
+- ~~Collections + New arrivals~~ → DEP-044 closed.
+- HTML description; hotspot markers; DEP-025; 2-й consent — опц.
+- Image cache purge (q82).
+- Ops: polish merge; Mini App regression.
 
 ## Фаза: Категории v2 (A/B/C — реструктуризация категорий/подкатегорий CRM)
 
@@ -479,6 +477,7 @@
 | DEP-041 | **CMS «Партнёры» hero-only** (sections + admin + storefront card; без 2 инфо-блоков) | backend `268fc03`; storefront `9e6ee74` | verified | **deployed** (2026-07-21) | — | title=крошки; hero.heading+text; нет double body |
 | DEP-042 | **Company hero card parity** (700px / font_24 / intrinsic photo) | `muru-storefront` / `main` | verified | **deployed** (2026-07-21) | — | only `CompanyHeroSection`; mission/promo untouched |
 | DEP-043 | **Phase C2: CRM users** — `/api/crm/users` + admin Settings→Users (owner-only) | `muru-backend-local` (`ca40542`) | verified | **deployed** (2026-07-21, prod `/var/www/muru`; staging STOP skipped) | `deploy.sh`, no migration | operator smoke OK |
+| DEP-044 | **Collections + New arrivals** — E1/E2, migration 030, admin UI, storefront `/new/` | BE `37d8065`; SF `1e1cd36` | verified | **deployed** (2026-07-22; BE+SF; staging STOP skipped) | 030×2 then deploy.sh; SF pull+build | operator: «всё работает» |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -526,6 +525,14 @@
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-07-22 (сессия 40 CLOSE):** DEP-044 **fully deployed**. BE prod `37d8065` (030 + deploy.sh 2026-07-21); SF `1e1cd36` на web.murushop.ru. Оператор: «всё работает». Эпик collections+new arrivals закрыт. Handoff → надзор (отчёт в чате).
+- **2026-07-21 (сессия 40, DEP-044 BE):** Prod `/var/www/muru` FF `ca40542→37d8065`; psql 030 OK (2nd run NOTICE skip); `deploy.sh` OK; health 200; PM2 muru-backend ↺156. Admin UI в том же деплое. **Осталось:** pull storefront `1e1cd36` → `/new/` на web.murushop.ru.
+- **2026-07-21 (сессия 40, E2-sf ACCEPT):** **ACCEPT `2026-07-21-27-e2-sf`** — `/new/` gifts-clone; nav after «О нас»; `sort=new` by `newArrivalAt`; tsc clean; mock build OK (`ƒ /new`). Sitemap fail with downed API — pre-existing. **Эпик код complete.** Next: commit BE+SF → staging 030 first → STOP → FF/prod.
+- **2026-07-21 (сессия 40, E2-admin ACCEPT):** **ACCEPT `2026-07-21-26-e2-admin`** — checkbox + read-only дата; list filter/sort `newArrivalAt`; tsc+build clean. Выдан **`2026-07-21-27-e2-sf`** (storefront `/new/`).
+- **2026-07-21 (сессия 40, E2-be ACCEPT):** **ACCEPT `2026-07-21-25-e2-be`** — 030 + schema.sql; date invariant 3 cases; public `newArrival`/`sort=new`; CRM filter+`sortBy=newArrivalAt`. Verify: tsc; focused 61 tests; executor 455/455. E1 intact. Local psql skipped. Выдан **`2026-07-21-26-e2-admin`**.
+- **2026-07-21 (сессия 40, E1-admin ACCEPT):** **ACCEPT `2026-07-21-24-e1-admin`** — ProductEdit коллекции + list filter; create→PUT→navigate; tsc+build clean. Выдан **`2026-07-21-25-e2-be`** (миграция 030).
+- **2026-07-21 (сессия 40, E1-be ACCEPT):** **ACCEPT `2026-07-21-23-e1-be`** — GET/PUT `/api/crm/products/:sku/collections` `{ collectionIds }`; append sort_order; 404/422; CRM `collectionId` EXISTS. Verify: tsc clean; focused tests OK (full 446 executor). content/setCollectionProducts не тронуты. Выдан **`2026-07-21-24-e1-admin`**.
+- **2026-07-21 (сессия 40 start):** Эпик «коллекции из карточки + Новинки». Порядок E1-be→E1-admin→E2-be(030)→E2-admin→E2-sf; staging-first. Выдан **`2026-07-21-23-e1-be`**.
 - **2026-07-21 (сессия 39 CLOSE, Phase C2):** DEP-043 **deployed** prod `/var/www/muru` — оператор: «всё работает». SHA **`ca40542`**. Staging STOP пропущен (осознанно). Эпик users закрыт. Handoff → надзорный оркестратор (отчёт в чате сессии 39).
 - **2026-07-21 (сессия 39, Phase C2 commit):** A+B committed `ca40542` on `feature/admin-users`. DEP-043 pending. Next: push → staging smoke → FF master → prod `deploy.sh`.
 - **2026-07-21 (сессия 39, Phase C2 B ACCEPT):** **ACCEPT `2026-07-21-22-admin`** — Settings hub + Users page; owner NavLink; RequireOwner redirect; self/last-owner UI guards; password reset self OK; email-match (без `/me` id); `apiFetchNoContent` для DELETE 204. Verify: `tsc -b` + `vite build` clean. Backend A не тронут. **Next:** commit A+B → staging smoke → FF/prod DEP.
