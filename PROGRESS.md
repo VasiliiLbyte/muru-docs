@@ -113,8 +113,8 @@
 ## Следующее
 
 ### Активно: после Mobile M0–M6
-- **Mobile adaptation — CODE COMPLETE** на `feat/mobile-adaptation` @ **`516b5b7`**. Гейт: overflow **0**, ios-zoom **0**, tap **0** (devtools/skip-link exclude), vitest **39/39**, tsc+build clean (mock). **Не** merged / **не** deployed — отдельное решение (staging → main → VPS).
-- Следующие кандидаты: merge/staging Mobile; CRM import REAL SKU (parity audit); admin sidebar commit; DEP-047 VPS; soft W-list.
+- **Mobile adaptation — MERGED** `origin/main` @ **`516b5b7`**. Deploy → VPS `/var/www/muru-storefront` (DEP-048 pending).
+- Следующие кандидаты: VPS deploy Mobile; CRM import REAL SKU (parity audit — **не** в git); admin sidebar commit; soft W-list.
 
 ### Параллельный ops (не блокирует Mobile)
 - **Catalog parity audit (Sheet cut-off) — DONE 2026-07-28:** отчёт [`CATALOG_PARITY_AUDIT.md`](CATALOG_PARITY_AUDIT.md), артефакты `audits/catalog-parity-2026-07-28/`, скрипт `scripts/catalog-parity-audit.py`. Sheet **325** / CRM **264** / muru.ru **229**. Блокер cut-off: **38 REAL** SKU (`MU0296`–`MU0333`) в таблице нет в CRM; 23 STUB игнор; имена **3**, цены **5**; фото Sheet>CRM **91**, CRM behind Bitrix within cap **83**. **Next:** executor-промпт CRM import REAL + photo backfill (не Mobile).
@@ -138,7 +138,7 @@
 
 Сознательные отклонения: accordion меню; gap-y-6; filters sheet; sticky PDP/basket/checkout; thumbs@lg; footer без accordion.
 
-**Pending:** merge → staging smoke → `main` → VPS (не в скоупе сессии 45).
+**Pending:** VPS deploy `web.murushop.ru` @ `516b5b7` (DEP-048).
 
 ### Закрыто в сессии 43: W-SEC (DEP-046)
 Основание: аудит надзора 2026-07-22. Staging-first соблюдён. BE `69c83aa` + SF `4d06417` на prod. G-SEC GREEN.
@@ -537,7 +537,8 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-044 | **Collections + New arrivals** — E1/E2, migration 030, admin UI, storefront `/new/` | BE `37d8065`; SF `1e1cd36` | verified | **deployed** (2026-07-22; BE+SF; staging STOP skipped) | 030×2 then deploy.sh; SF pull+build | operator: «всё работает» |
 | DEP-045 | **Home visual parity** — banner card + header (logo/nav/search) vs muru.ru | `muru-storefront` / `main` | verified | **deferred** (после W-SEC) | push → VPS pull+build+restart | prompts `11`+`12`; tip `1b17d5a` |
 | DEP-046 | **W-SEC hardening** SEC-1…5 | BE `69c83aa` + SF `4d06417` | verified | **deployed** ✅ | — | staging+prod API+BFF G-SEC GREEN 2026-07-28 |
-| DEP-047 | **Nav accent:** top-nav «Новинки» + catalog drawer «Распродажа» → `text-brand` | `muru-storefront` / `main` (`99db9c3`) | verified | **pending** | VPS pull+build+restart (DEPLOY.md §6) | prompt `2026-07-28-08`; mobile out of scope |
+| DEP-047 | **Nav accent:** top-nav «Новинки» + catalog drawer «Распродажа» → `text-brand` | `muru-storefront` / `main` (`99db9c3`) | verified | **superseded** by DEP-048 | — | входит в tip `516b5b7` |
+| DEP-048 | **Mobile adaptation M0–M6** | `muru-storefront` / `main` (`516b5b7`) | verified | **pending** | VPS pull+build+restart (DEPLOY.md §6) | FF `feat/mobile-adaptation`; screenshots in e2e/; no BE/migrations |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
