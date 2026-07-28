@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-28 (сессия 43: W-SEC DEP-046 CLOSED — prod G-SEC GREEN)
+Последнее обновление: 2026-07-28 (сессия 45 CLOSE: Mobile M0–M6 ACCEPT @ `516b5b7`; +сессия 46 catalog parity)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -112,10 +112,33 @@
 
 ## Следующее
 
-### Активно: после W-SEC
-- **DEP-045** home visual parity (banner+header) — deferred, tip уже в `1b17d5a` на main до W-SEC SF commit; при необходимости re-check vs `4d06417`.
-- W soft-list / W5 SMS.
-- Ops: сверить PM2 `instances:1` (в list видно `cluster_mode`).
+### Активно: после Mobile M0–M6
+- **Mobile adaptation — CODE COMPLETE** на `feat/mobile-adaptation` @ **`516b5b7`**. Гейт: overflow **0**, ios-zoom **0**, tap **0** (devtools/skip-link exclude), vitest **39/39**, tsc+build clean (mock). **Не** merged / **не** deployed — отдельное решение (staging → main → VPS).
+- Следующие кандидаты: merge/staging Mobile; CRM import REAL SKU (parity audit); admin sidebar commit; DEP-047 VPS; soft W-list.
+
+### Параллельный ops (не блокирует Mobile)
+- **Catalog parity audit (Sheet cut-off) — DONE 2026-07-28:** отчёт [`CATALOG_PARITY_AUDIT.md`](CATALOG_PARITY_AUDIT.md), артефакты `audits/catalog-parity-2026-07-28/`, скрипт `scripts/catalog-parity-audit.py`. Sheet **325** / CRM **264** / muru.ru **229**. Блокер cut-off: **38 REAL** SKU (`MU0296`–`MU0333`) в таблице нет в CRM; 23 STUB игнор; имена **3**, цены **5**; фото Sheet>CRM **91**, CRM behind Bitrix within cap **83**. **Next:** executor-промпт CRM import REAL + photo backfill (не Mobile).
+- **Admin sidebar «Товары»** (`2026-07-28-09`) — ACCEPT на `feature/admin-sidebar-products`, **не committed**; commit→FF `master`→DEP → VPS `deploy.sh`.
+- **DEP-047** nav accent — `origin/main` @ **`99db9c3`** (+ tip может быть `7e42be3`); ждать VPS pull+build.
+- **DEP-045** home visual parity — deferred.
+- W soft-list / W5 SMS; PM2 `instances:1`.
+
+### Закрыто в сессии 45: Mobile adaptation M0–M6
+Ветка `feat/mobile-adaptation` tip **`516b5b7`**. Эталон: muru.ru mobile UA (поведение/метрики).
+
+| Этап | SHA | Итог |
+|---|---|---|
+| M0 harness | `b5b2b61` | red baseline: overflow 14, tap ~190, zoom 5 |
+| M1 tokens | `57060c3` | zoom 0; tap 161; overflow 12 |
+| M2 header | `c050b78` | overflow 0; search overlay; menu account |
+| M3 catalog | `2afb752` | grid 2/3/4; filter bottom sheet |
+| M4 PDP | `e26ee26` | snap gallery; sticky buy; related carousel |
+| M5 commerce | `51a8e5b` | basket/checkout sticky; account nav |
+| M6 gate | `516b5b7` | home/footer/content; **full green** |
+
+Сознательные отклонения: accordion меню; gap-y-6; filters sheet; sticky PDP/basket/checkout; thumbs@lg; footer без accordion.
+
+**Pending:** merge → staging smoke → `main` → VPS (не в скоупе сессии 45).
 
 ### Закрыто в сессии 43: W-SEC (DEP-046)
 Основание: аудит надзора 2026-07-22. Staging-first соблюдён. BE `69c83aa` + SF `4d06417` на prod. G-SEC GREEN.
@@ -132,7 +155,7 @@
 
 ### Фаза W — **LIVE на prod** (+ post-prod UX hotfixes + W-SEC)
 ТЗ: [`PHASE_W.md`](PHASE_W.md). G0–G4 ✅. Staging STOP фазы W был пропущен → дыры закрыты пакетом **W-SEC (DEP-046)**.  
-**BE** `master` @ **`69c83aa`**. **SF** `main` @ **`4d06417`**.
+**BE** `master` @ **`69c83aa`**. **SF** `main` @ **`99db9c3`** (W-SEC tip был `4d06417`; +nav accent).
 
 Prod env (VPS): `CUSTOMER_JWT_SECRET`, `SMTP_*`, `SMARTCAPTCHA_*`, **`INTERNAL_PROXY_TOKEN`** (общий BE↔SF BFF); SF `NEXT_PUBLIC_SMARTCAPTCHA_CLIENT_KEY`.
 
@@ -514,6 +537,7 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-044 | **Collections + New arrivals** — E1/E2, migration 030, admin UI, storefront `/new/` | BE `37d8065`; SF `1e1cd36` | verified | **deployed** (2026-07-22; BE+SF; staging STOP skipped) | 030×2 then deploy.sh; SF pull+build | operator: «всё работает» |
 | DEP-045 | **Home visual parity** — banner card + header (logo/nav/search) vs muru.ru | `muru-storefront` / `main` | verified | **deferred** (после W-SEC) | push → VPS pull+build+restart | prompts `11`+`12`; tip `1b17d5a` |
 | DEP-046 | **W-SEC hardening** SEC-1…5 | BE `69c83aa` + SF `4d06417` | verified | **deployed** ✅ | — | staging+prod API+BFF G-SEC GREEN 2026-07-28 |
+| DEP-047 | **Nav accent:** top-nav «Новинки» + catalog drawer «Распродажа» → `text-brand` | `muru-storefront` / `main` (`99db9c3`) | verified | **pending** | VPS pull+build+restart (DEPLOY.md §6) | prompt `2026-07-28-08`; mobile out of scope |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -561,6 +585,18 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-07-28 (сессия 45 CLOSE Mobile):** **ACCEPT `2026-07-28-17-m6`** @ `516b5b7` — эпик M0–M6 **CLOSED** (code). Verify: home banner px-4; media-card/static-prose max-w; footer min-h-11; tap allow-list Next.js Issues + skip-link; screenshots m6×5; tsc clean; vitest **39/39**; build OK (mock). Gate vs M0: overflow 14→0, zoom 5→0, tap ~190→0. Outside: merge/staging/prod. Next ops: staging smoke → FF main → DEP.
+- **2026-07-28 (сессия 45, ACCEPT M5 → M6):** **ACCEPT `2026-07-28-16-m5`** @ `51a8e5b`. Verify: basket fixed summary+pb-safe+qty size-11; checkout sticky pay; CDEK map min-w-0 overflow; account horizontal nav; auth inputMode+login min-h-11; captcha wrap; tsc clean; overflow 0 all routes; tap 153. Soft: account скрины = login redirect; YooKassa redirect N/A. Выдан **`2026-07-28-17-m6`** (финал).
+- **2026-07-28 (сессия 45, ACCEPT M4 → M5):** **ACCEPT `2026-07-28-15-m4`** @ `e26ee26`. Verify: gallery snap+dots+thumbs lg; purchase full-width min-h-12; sticky bar IO/footer/`data-base-ui-scroll-locked`+pb-safe; specs/description min-h-11; related snap &lt;lg; tsc clean; overflow 0; tap 154. Soft: mock placeholders; sticky скрин цена vs PDP-375. Выдан **`2026-07-28-16-m5`**.
+- **2026-07-28 (сессия 45, ACCEPT M3 → M4):** **ACCEPT `2026-07-28-14-m3`** @ `2afb752`. Verify: grid 2/lg3/xl4; toolbar bottom sheet; breadcrumbs overflow-x; pagination ≥44; overflow 0. Выдан **`2026-07-28-15-m4`**.
+- **2026-07-28 (сессия 45, ACCEPT M2 → M3):** **ACCEPT `2026-07-28-13-m2`** @ `c050b78`. Verify: single-row header; search Dialog; menu account/counts; overflow 0; tap 156. Выдан **`2026-07-28-14-m3`**.
+- **2026-07-28 (сессия 46, catalog parity):** Аудит Sheet ↔ CRM/web.murushop.ru ↔ muru.ru. Скрипт `scripts/catalog-parity-audit.py`; отчёт `CATALOG_PARITY_AUDIT.md`; CSV/JSON в `audits/catalog-parity-2026-07-28/`. Counts: Sheet **325**, CRM **264**, Bitrix PDP **229**. Missing in CRM: **38 REAL** (`MU0296`–`MU0333`) + **23 STUB**; name diffs **3**; price diffs **5**; photo Sheet>CRM **91**; CRM behind Bitrix within cap **83**. **Verdict:** таблицу отрезать нельзя до импорта REAL + photo/name/price backfill. Mobile M0–M6 не затронут.
+- **2026-07-28 (сессия 45, ACCEPT M1 → M2):** **ACCEPT `2026-07-28-12-m1`** @ `57060c3`. zoom 5→0, tap→161, overflow 14→12. Выдан **`2026-07-28-13-m2`**.
+- **2026-07-28 (сессия 45, ACCEPT M0 → M1):** **ACCEPT `2026-07-28-11-m0`** @ `b5b2b61`. Baseline red. Выдан **`2026-07-28-12-m1`**.
+- **2026-07-28 (сессия 45 start):** Открыт эпик **Mobile adaptation M0–M6**. Выдан **`2026-07-28-11-m0`**.
+- **2026-07-28 (сессия 44c):** **ACCEPT `2026-07-28-10`** — `/catalog/` root tiles `aspect-square` (+ skeleton). SF `main` uncommitted. Next: commit+push → VPS.
+- **2026-07-28 (сессия 44b):** **ACCEPT `2026-07-28-09`** — «Товары» в сайдбар admin. Ветка `feature/admin-sidebar-products`: CatalogRootLayout + ProductsLayout; products вне CatalogLayout tabs; exclusive active. `tsc -b`+`build` OK (оркестратор). Uncommitted. Next: commit → FF master → DEP → deploy.sh.
+- **2026-07-28 (сессия 44):** **ACCEPT `2026-07-28-08`** nav brand accent. Diff 4 files OK (`NavItem.accent`, `NavLink`, `CatalogMenuPanel` + `isSaleCategorySlug`); `tsc` clean. Commit+push `99db9c3` → `origin/main`. **DEP-047 pending VPS.** Mobile / drawer left «Новинки» — out of scope.
 - **2026-07-28 (сессия 43 CLOSE W-SEC):** **DEP-046 CLOSED**. Prod BFF retest: captcha (email fail window) + 429@11 — путь через BFF+token жив. Итог: SEC-1…5 на prod, staging-first соблюдён, exploit XFF rotation закрыт. Soft: PM2 показывает `cluster_mode` (сверить instances=1); SMTP staging placeholder. Next: DEP-045 / soft-list.
 - **2026-07-28 (сессия 43, prod G-SEC API GREEN):** BE+SF deployed (`69c83aa`/`4d06417`), tokens len 64. Direct API rotate XFF: 401×3 → captcha@4–10 → 429@11–14. BFF сразу 429 — тот же client IP ещё в окне лимита после API-прогона (не регрессия). Retest BFF after sleep.
 - **2026-07-28 (сессия 43, G-SEC staging GREEN):** Staging `69c83aa` + 031 + JWT; exploit rotate first-XFF: try1–2 → 401, try3–10 → captcha required, try11–14 → 429. Старая дыра закрыта. Next: prod env token + deploy BE `/var/www/muru` + SF `web.murushop.ru` + prod G-SEC.
