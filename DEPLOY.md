@@ -36,6 +36,7 @@
 - PostgreSQL (локально или managed)
 - Путь приложения: `/var/www/muru`
 - PM2 process: `muru-backend`, порт **4000**
+- **`instances: 1` обязательно** для защиты ЛК (rate-limit / login-fail / email-send counters живут **в памяти процесса**). `ecosystem.config.js` и `ecosystem.staging.config.js` уже задают `instances: 1`. Переключение в PM2 cluster / `instances: N` (N>1) **без** внешнего хранилища счётчиков молча ломает captcha/429: каждый воркер считает отдельно. Не менять, пока counters не вынесены в Redis (или аналог).
 
 ### Чеклист перед деплоем
 
@@ -43,7 +44,9 @@
 - [ ] Для рискованных изменений — обкатано на staging (`api-staging.murushop.ru`, см. §2a) перед прод-деплоем
 - [ ] Миграции БД подготовлены (см. §4)
 - [ ] `.env` на VPS обновлён (новые ключи)
+- [ ] При включённом ЛК (`CUSTOMER_JWT_SECRET`): на API и на витрине одинаковый **`INTERNAL_PROXY_TOKEN`** (≥32 символов, server-only на SF)
 - [ ] Nginx конфиг актуален (`deploy/nginx-murushop.ru.conf`)
+- [ ] PM2 `instances: 1` для `muru-backend` / `muru-backend-staging` (см. выше)
 
 > С 2026-07-06 (cutover, `PROGRESS.md` DEP-008) прод `/var/www/muru` деплоится **напрямую из канона** `muru-backend-local` (`origin` на VPS переключён). Форвард-порт в `MURU_miniAPP` (заморожен) больше не нужен — см. `FORWARD_PORT.md` (deprecated).
 
@@ -112,7 +115,8 @@ mkdir -p /var/www/muru/cache/img
 
 **URL:** `https://api-staging.murushop.ru` (API only, без frontend mini app)
 **Путь на VPS:** `/var/www/muru-staging`
-**PM2:** `muru-backend-staging`, порт **4001**, отдельный процесс от прод `muru-backend`
+**PM2:** `muru-backend-staging`, порт **4001**, отдельный процесс от прод `muru-backend`  
+**instances:** всегда **1** (in-memory rate limits / login-fail / email budgets — см. §2).
 
 ### Жёсткие правила (не нарушать)
 - `TELEGRAM_BOT_TOKEN` в staging `.env` — **всегда пусто**. Два поллера на один токен = `409 Conflict` и падение прод-бота.

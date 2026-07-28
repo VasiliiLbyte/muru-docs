@@ -1,6 +1,6 @@
 # Фаза W — Личный кабинет покупателя (storefront)
 
-Статус: **CODE COMPLETE** · Открыта 2026-07-22 (сессия 41) · G0–G4 (код) ✅ · Next: staging-first 031 → smoke → FF/prod
+Статус: **LIVE на prod** · Открыта 2026-07-22 (сессия 41) · G0–G4 ✅ · **W-SEC CLOSED 2026-07-28** (staging-first + prod G-SEC) · Затем: W5 (SMS) после альфа-имени; soft follow-ups в `PROGRESS.md` · DEP-045 home visual отложен
 
 Закрывает открытый пункт SPEC §14 «авторизация сайта (SMS vs email)».
 

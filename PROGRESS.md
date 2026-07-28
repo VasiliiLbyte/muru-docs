@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-22 (сессия 41: G4 code ACCEPT — Phase W код complete; next staging)
+Последнее обновление: 2026-07-28 (сессия 43: W-SEC DEP-046 CLOSED — prod G-SEC GREEN)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -112,10 +112,41 @@
 
 ## Следующее
 
-### Активно: Фаза W — **код complete** → staging-first (миграция 031)
-ТЗ: [`PHASE_W.md`](PHASE_W.md). G0–G4 (код) ✅.  
-BE `feature/phase-w-auth` + SF `feature/phase-w-account` — **uncommitted**.  
-**Next:** commit обеих веток → staging: psql 031 **до** кода → env (CUSTOMER_JWT_SECRET, SMTP, SmartCaptcha) → deploy → smoke → STOP надзора → FF master/main → prod.
+### Активно: после W-SEC
+- **DEP-045** home visual parity (banner+header) — deferred, tip уже в `1b17d5a` на main до W-SEC SF commit; при необходимости re-check vs `4d06417`.
+- W soft-list / W5 SMS.
+- Ops: сверить PM2 `instances:1` (в list видно `cluster_mode`).
+
+### Закрыто в сессии 43: W-SEC (DEP-046)
+Основание: аудит надзора 2026-07-22. Staging-first соблюдён. BE `69c83aa` + SF `4d06417` на prod. G-SEC GREEN.
+
+| Блок | Статус |
+|---|---|
+| SEC-1…5 | ACCEPT + deployed |
+| G-SEC staging / prod API / prod BFF | GREEN |
+
+Константы: N captcha email = **3**; M писем/email = **5/час**.
+
+### Отложено: Home visual parity / DEP-045
+- ACCEPT banner+header (`11`/`12`); SF tip `1b17d5a` на `main`. Commit+VPS deploy — после W-SEC или отдельным ops-окном.
+
+### Фаза W — **LIVE на prod** (+ post-prod UX hotfixes + W-SEC)
+ТЗ: [`PHASE_W.md`](PHASE_W.md). G0–G4 ✅. Staging STOP фазы W был пропущен → дыры закрыты пакетом **W-SEC (DEP-046)**.  
+**BE** `master` @ **`69c83aa`**. **SF** `main` @ **`4d06417`**.
+
+Prod env (VPS): `CUSTOMER_JWT_SECRET`, `SMTP_*`, `SMARTCAPTCHA_*`, **`INTERNAL_PROXY_TOKEN`** (общий BE↔SF BFF); SF `NEXT_PUBLIC_SMARTCAPTCHA_CLIENT_KEY`.
+
+**Post-prod hotfixes (ACCEPT):** `08` `6db373e` · `09` `a68c474` · `10` `0718bdd`.  
+**W-SEC:** prompts `2026-07-28-01`…`07`; G-SEC staging+prod GREEN.
+
+### Soft / follow-ups Phase W
+- Expired access short-circuit: на 401 `ensureAccessToken` может не refresh’ить, если в памяти ещё лежит expired JWT.
+- Auth-fail CTA только на account home (другие разделы ЛК — сырой upstream error).
+- `AuthSuccessToast` монтируется дважды (mobile+desktop `HeaderActions`) — дубль portal.
+- Refresh без `customer` → подпись «Кабинет» до следующего login.
+- ~~SMTP verify fail → `process.exit(1)`~~ → входит в **SEC-5.4**.
+- Header flash «Войти» до bootstrap; captcha client gate soft.
+- W5 SMS — после альфа-имени.
 
 ### Закрыто: Коллекции из карточки + «Новинки» (DEP-044)
 BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: «всё работает» (2026-07-22). Staging STOP пропущен (осознанно, как C2).
@@ -481,6 +512,8 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-042 | **Company hero card parity** (700px / font_24 / intrinsic photo) | `muru-storefront` / `main` | verified | **deployed** (2026-07-21) | — | only `CompanyHeroSection`; mission/promo untouched |
 | DEP-043 | **Phase C2: CRM users** — `/api/crm/users` + admin Settings→Users (owner-only) | `muru-backend-local` (`ca40542`) | verified | **deployed** (2026-07-21, prod `/var/www/muru`; staging STOP skipped) | `deploy.sh`, no migration | operator smoke OK |
 | DEP-044 | **Collections + New arrivals** — E1/E2, migration 030, admin UI, storefront `/new/` | BE `37d8065`; SF `1e1cd36` | verified | **deployed** (2026-07-22; BE+SF; staging STOP skipped) | 030×2 then deploy.sh; SF pull+build | operator: «всё работает» |
+| DEP-045 | **Home visual parity** — banner card + header (logo/nav/search) vs muru.ru | `muru-storefront` / `main` | verified | **deferred** (после W-SEC) | push → VPS pull+build+restart | prompts `11`+`12`; tip `1b17d5a` |
+| DEP-046 | **W-SEC hardening** SEC-1…5 | BE `69c83aa` + SF `4d06417` | verified | **deployed** ✅ | — | staging+prod API+BFF G-SEC GREEN 2026-07-28 |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -528,6 +561,29 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-07-28 (сессия 43 CLOSE W-SEC):** **DEP-046 CLOSED**. Prod BFF retest: captcha (email fail window) + 429@11 — путь через BFF+token жив. Итог: SEC-1…5 на prod, staging-first соблюдён, exploit XFF rotation закрыт. Soft: PM2 показывает `cluster_mode` (сверить instances=1); SMTP staging placeholder. Next: DEP-045 / soft-list.
+- **2026-07-28 (сессия 43, prod G-SEC API GREEN):** BE+SF deployed (`69c83aa`/`4d06417`), tokens len 64. Direct API rotate XFF: 401×3 → captcha@4–10 → 429@11–14. BFF сразу 429 — тот же client IP ещё в окне лимита после API-прогона (не регрессия). Retest BFF after sleep.
+- **2026-07-28 (сессия 43, G-SEC staging GREEN):** Staging `69c83aa` + 031 + JWT; exploit rotate first-XFF: try1–2 → 401, try3–10 → captcha required, try11–14 → 429. Старая дыра закрыта. Next: prod env token + deploy BE `/var/www/muru` + SF `web.murushop.ru` + prod G-SEC.
+- **2026-07-28 (сессия 43, SEC-5 closed → G-SEC):** **ACCEPT `2026-07-28-07-sec5-sf`** (CSP Report-Only). **5.6** записан в `DEPLOY.md` (PM2 `instances: 1` + `INTERNAL_PROXY_TOKEN`). Код SEC-1…5 на `fix/w-sec-hardening` (BE+SF), uncommitted. **Next: G-SEC на staging** (чеклист в чате); prod только после зелёного G-SEC.
+- **2026-07-28 (сессия 43, ACCEPT SEC-5-be):** **ACCEPT `2026-07-28-06-sec5-be`**. Verify: HS256 на 3 jwt.verify; GET /verify RL 30; phone normalize + live `+79219449115`; SMTP startup no exit; tsc + 48 релевантных тестов OK. Выдан **`2026-07-28-07-sec5-sf`**.
+- **2026-07-28 (сессия 43, ACCEPT SEC-4):** **ACCEPT `2026-07-28-05-sec4-be`**. Verify: register occupied/new → `{ ok: true }`; best-effort already-registered mail; cleanup dry-run без DELETE; kind `already_registered` M=5/h; tsc + 31 SEC-4 tests OK. Soft: порядок assert/hash чуть отличается occupied vs new. Выдан **`2026-07-28-06-sec5-be`**.
+- **2026-07-28 (сессия 43, ACCEPT SEC-3):** **ACCEPT `2026-07-28-04-sec3-be`**. Verify: atomic `UPDATE…RETURNING`; reuse → mass-revoke; parallel mock one-success/one-401; tsc OK; customer-auth 19/19. Soft: атомарность БД через mock claimCount (не live PG); parallel loser может отозвать новый RT победителя (by design + SF single-flight). Выдан **`2026-07-28-05-sec4-be`**.
+- **2026-07-28 (сессия 43, ACCEPT SEC-2):** **ACCEPT `2026-07-28-03-sec2-sf`**. Verify: whitelist + `..`/`%2e%2e`/slash reject; assert до upstream; typecheck OK; bff-proxy tests 11/11. Выдан **`2026-07-28-04-sec3-be`**.
+- **2026-07-28 (сессия 43, ACCEPT SEC-1-sf → SEC-1 closed):** **ACCEPT `2026-07-28-02-sec1-sf`**. Verify: last-XFF; `X-Client-IP`+token; no forged XFF; typecheck OK; bff-proxy tests 6/6. SEC-1 целиком закрыт. Выдан **`2026-07-28-03-sec2-sf`**.
+- **2026-07-28 (сессия 43, ACCEPT SEC-1-be):** **ACCEPT `2026-07-28-01-sec1-be`**. Verify: `resolveClientIp` token→X-Client-IP / else last-XFF; email fail captcha N=3; mail M=5/h; env INTERNAL_PROXY_TOKEN; тесты rate-limit 8/8 + customer-auth кейсы rotate/429 OK; tsc чисто. Soft: uncommitted; `recordEmailSend` до SMTP на register. Выдан **`2026-07-28-02-sec1-sf`**.
+- **2026-07-28 (сессия 43 start):** Проверка надзорного пакета W-SEC — **не начат** (нет веток/токена/фиксов; `clientIp` всё ещё first-XFF). Открыта фаза W-SEC; DEP-045 отложен. Выдан **`2026-07-28-01-sec1-be`** → Plan mode в `muru-backend-local`. После ACCEPT — SEC-1-sf.
+- **2026-07-22 (сессия 42, ACCEPT header → DEP-045):** **ACCEPT `2026-07-22-12-home-header`**. Logo 206×40; `lg:py-2` + logo/catalog `gap-8`; nav `text-[14px] tracking-normal`; search 15px; action gaps/labels 12px. CSS vars untouched. typecheck OK. Together with banner → **DEP-045** commit+deploy.
+
+- **2026-07-22 (сессия 42, ACCEPT home-banner):** **ACCEPT `2026-07-22-11-home-banner`**. Verify: 1 файл `home-banner.tsx`; card 568/`bg-white`/40×64; title 36/light/tracking-normal; subtitle leading-5; CTA h45/mt-4/px-8/font-light; scrim density shared; typecheck OK. Next: `12-home-header`.
+- **2026-07-22 (сессия 41 CLOSE / handoff надзору):** Phase W **LIVE**. BE `cb3a1ae`, SF `0718bdd`. Code G0–G4 + prod deploy (staging skip) + SMTP/JWT/captcha + 3 post-prod hotfixes (`6db373e`, `a68c474`, `0718bdd`). Полный отчёт — в чате handoff. Soft list в «Следующее».
+- **2026-07-22 (сессия 41, ACCEPT header-account):** **ACCEPT `2026-07-22-10-w-header-account`**. Zustand session store; header name+hover Menu; login toast; logout shared. typecheck OK; vitest **29/29**. Soft: toast dual-mount; «Кабинет» if refresh w/o customer.
+- **2026-07-22 (сессия 41, header account state):** `09-w-auth-ux` deployed + verified (logout/modal OK, скрины). Запрошены: имя в шапке, login-тост, hover-меню (референс muru.ru). Выдан **`2026-07-22-10-w-header-account`**.
+- **2026-07-22 (сессия 41, ACCEPT auth UX):** **ACCEPT `2026-07-22-09-w-auth-ux`**. Variant A guard; hard logout; BFF clear all logout paths; LoginDialog header. typecheck OK; vitest **25/25**. Soft: other account views raw errors; always «Войти» in header. Next: deploy SF.
+- **2026-07-22 (сессия 41, auth UX):** Logout не редиректит; мёртвый `muru_customer_rt` → guard шлёт с `/login` на `/account` без access. Запрошен login modal как muru.ru. Выдан **`2026-07-22-09-w-auth-ux`**.
+- **2026-07-22 (сессия 41, SF hotfix deployed):** VPS `/var/www/muru-storefront` FF `1104bfc→6db373e`; build OK; pm2 online; curl account 502→307 (no cookie = guard redirect). Ждём browser F5 smoke.
+- **2026-07-22 (сессия 41, ACCEPT w-session):** **ACCEPT `2026-07-22-08-w-session`**. Verify: single-flight `ensureAccessToken`, safe clear, skipAuth forms, home bootstrap; typecheck OK; vitest **25/25**. Soft: expired-access short-circuit on 401. Next: deploy SF → F5 smoke.
+- **2026-07-22 (сессия 41, W-session bug):** Prod ЛК OK (SMTP smtp.mail.ru, JWT, captcha). Cookie `muru_customer_rt` persists; F5 → «Authorization token is required». Root cause: parallel refresh race + rotate-on-use. Выдан **`2026-07-22-08-w-session`**.
+- **2026-07-22 (сессия 41, Phase W prod recovery):** Direct prod deploy (staging skip). Crash-loop: bad SMTP_HOST + CUSTOMER_JWT → exit(1). Fix: comment JWT, `pm2 delete`+start BE → health/catalog 200; SF rebuild+restart → home/login 200. Later: SMTP+JWT+captcha enabled; register/verify OK.
 - **2026-07-22 (сессия 41, G4 ACCEPT / Phase W code complete):** **ACCEPT `2026-07-22-07-w4-sf`**. Bearer на web create только при access; merge favorites after login + clear local; tests 22/22; typecheck+mock build OK. Soft: clear local даже если все POST favorites упали. **Эпик код W0–W4 закрыт.** Next: commit → staging 031-first → smoke → FF/prod. Handoff надзору.
 - **2026-07-22 (сессия 41, W4-be ACCEPT → W4-sf):** **ACCEPT `2026-07-22-06-w4-be`**. Web create: optional Bearer → snapshot.customerId; fulfill пишет customer_*; linkGuestOrders only if verified; backfill dry-run script. tsc OK; vitest **488/488**. dry-run local: matched 1 / failed 1 (no order_id). Выдан **`2026-07-22-07-w4-sf`**.
 - **2026-07-22 (сессия 41, G3 ACCEPT → W4-be):** **ACCEPT `2026-07-22-05-w3`**. Soft empty-cookie fix + tests; auth forms + account shell; SmartCaptcha pkg; password ≥8; consent. typecheck OK; vitest **17/17**; mock build OK. Soft: captcha token не блокирует submit при наличии sitekey (бэкенд режет). Выдан **`2026-07-22-06-w4-be`**.
