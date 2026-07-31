@@ -36,6 +36,7 @@
 - PostgreSQL (локально или managed)
 - Путь приложения: `/var/www/muru`
 - PM2 process: `muru-backend`, порт **4000**
+- **ffmpeg + ffprobe** на PATH (для `POST /api/crm/content/upload-video`): `sudo apt install ffmpeg`
 - **`instances: 1` обязательно** для защиты ЛК (rate-limit / login-fail / email-send counters живут **в памяти процесса**). `ecosystem.config.js` и `ecosystem.staging.config.js` уже задают `instances: 1`. Переключение в PM2 cluster / `instances: N` (N>1) **без** внешнего хранилища счётчиков молча ломает captcha/429: каждый воркер считает отдельно. Не менять, пока counters не вынесены в Redis (или аналог).
 
 ### Чеклист перед деплоем
@@ -45,8 +46,9 @@
 - [ ] Миграции БД подготовлены (см. §4)
 - [ ] `.env` на VPS обновлён (новые ключи)
 - [ ] При включённом ЛК (`CUSTOMER_JWT_SECRET`): на API и на витрине одинаковый **`INTERNAL_PROXY_TOKEN`** (≥32 символов, server-only на SF)
-- [ ] Nginx конфиг актуален (`deploy/nginx-murushop.ru.conf`)
+- [ ] Nginx конфиг актуален (`deploy/nginx-murushop.ru.conf`) — для video upload нужен `client_max_body_size 64m` (webhook `/yookassa-webhook` остаётся `256k`)
 - [ ] PM2 `instances: 1` для `muru-backend` / `muru-backend-staging` (см. выше)
+- [ ] На VPS установлен `ffmpeg` (см. предусловия)
 
 > С 2026-07-06 (cutover, `PROGRESS.md` DEP-008) прод `/var/www/muru` деплоится **напрямую из канона** `muru-backend-local` (`origin` на VPS переключён). Форвард-порт в `MURU_miniAPP` (заморожен) больше не нужен — см. `FORWARD_PORT.md` (deprecated).
 
