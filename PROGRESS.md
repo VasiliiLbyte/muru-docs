@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-28 (сессия 45: DEP-048 Mobile deployed на web.murushop.ru)
+Последнее обновление: 2026-07-31 (сессия 51: admin RU errors + upload 15MB — ACCEPT, uncommitted)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -108,19 +108,86 @@
 - **Контакты/Клиентам visual + CMS — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпты `2026-07-16-10` + `10b`, `@ 1db2365`): contacts/help visual; DEP-037.
 - **Admin fixed tabs Клиентам/Контакты — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-11`, `@ 27256b2`, **ahead origin**): убрана вкладка «Страницы»; GET/PUT `pages/by-slug/:slug` allowlist help|contacts; FixedPageEditPage. Verify: tsc + service tests OK; route 401 = sandbox EPERM.
 
-**Storefront tip:** `origin/main` = `1db2365`. **Backend tip:** local `master` = `27256b2` (origin ≥ `c5bc0d5`).
+**Storefront tip:** VPS `/var/www/muru-storefront` @ **`47903bc`**, API=`https://murushop.ru/api`, `NOINDEX=true`. **Backend tip:** prod `/var/www/muru` @ **`e208323`** (032/033+backfill).
 
 ## Следующее
 
-### Активно: после Mobile M0–M6
-- **Mobile adaptation — DEPLOYED** `web.murushop.ru` @ **`516b5b7`** (DEP-048 ✅). Curl home/catalog 200; PM2 online.
-- Следующие кандидаты: CRM import REAL SKU (parity audit — **не** в git); admin sidebar commit; soft W-list; PM2 `instances:1` (list всё ещё `cluster_mode`).
+### Активно: RF-доступность (эпик CDN) — cutover web.murushop.ru PENDING
+Хронология мер (все вероятностные, диагноз ТСПУ — см. `DECISIONS.md` RF-001…RF-005):
+Латвия-база (из LV грузится, из RF — нет) → P0: h2 на 5 vhost → TLS1.2-only (бэкап `options-ssl-nginx.conf.bak-20260731-060529`) → **web-CDN (текущий шаг)**.
 
-### Параллельный ops (не блокирует Mobile)
-- **Catalog parity audit (Sheet cut-off) — DONE 2026-07-28:** отчёт [`CATALOG_PARITY_AUDIT.md`](CATALOG_PARITY_AUDIT.md), артефакты `audits/catalog-parity-2026-07-28/`, скрипт `scripts/catalog-parity-audit.py`. Sheet **325** / CRM **264** / muru.ru **229**. Блокер cut-off: **38 REAL** SKU (`MU0296`–`MU0333`) в таблице нет в CRM; 23 STUB игнор; имена **3**, цены **5**; фото Sheet>CRM **91**, CRM behind Bitrix within cap **83**. **Next:** executor-промпт CRM import REAL + photo backfill (не Mobile).
-- **Admin sidebar «Товары»** (`2026-07-28-09`) — ACCEPT на `feature/admin-sidebar-products`, **не committed**; commit→FF `master`→DEP → VPS `deploy.sh`.
-- **DEP-047** nav accent — `origin/main` @ **`99db9c3`** (+ tip может быть `7e42be3`); ждать VPS pull+build.
-- **DEP-045** home visual parity — deferred.
+**Готово (верифицировано скринами консоли YC 31.07.2026):**
+- Cert Certificate Manager «muru» (LE, web.murushop.ru) — Выпущен, до 29.10.2026; авто-renew через CNAME `_acme-challenge.web` → `fpqi47j7jj7matji1ieb.cm.yandexcloud.net` (уже в reg.ru).
+- CDN-ресурс `web.murushop.ru` (ID `bc8rqhgfke2xmg6c73li`, группа источников `common-109-172-38-194`): origin `109.172.38.194`, HTTPS, SNI=Host=`web.murushop.ru`, cert muru, TLS1.2+, HTTP→HTTPS, кэш «как у источника» (TTL день фолбэк), cookies учитываются, gzip on, сегментация on, CORS не добавлять, логи/экранирование off. **Edge CNAME-цель: `f69e224d86aa8887.topology.gslb.yccdn.ru`.** Метрики нулевые — DNS не переключён.
+
+**Осталось — cutover (обратим через DNS):**
+1. reg.ru зона murushop.ru: удалить ОБЕ дубль-A на web («A web → 109.172.38.194» и «A web.murushop.ru → 109.172.38.194»), затем CNAME `web` → `f69e224d86aa8887.topology.gslb.yccdn.ru` (в Subdomain вписывать «web»).
+2. Откат: удалить CNAME web, вернуть A web → 109.172.38.194.
+3. После переключения — Мониторинг ресурса: 2xx = ок; всплеск 5xx = origin-проблема (SNI/cert) → откат.
+4. Тест заказчика: мобилка, VPN OFF — грузится ли каркас web. Каталог/картинки могут быть пусты (тянутся с apex murushop.ru — Фаза 2, всё ещё под ТСПУ) — на сигнал «edge пропущен» НЕ влияет.
+- Дубли apex(@)/www/api-staging НЕ трогать (Фаза 2 split-origin).
+
+**Флаги:**
+- YC баланс 99,15₽ < 150₽/мес мин.пакет — пополнить (РФ-карта), иначе ресурс не потянет трафик.
+- reg.ru: домен не идентифицирован через Госуслуги — дедлайн **01.09.2026** для .ru.
+- ТСПУ-проходимость edge (сеть Gcore, RF-POP есть) — вероятностна, валидирует ТОЛЬКО тест заказчика.
+- muru.ru cutover — ТОЛЬКО за валидированный edge (www.muru.ru→CNAME edge, apex 301→www), НЕ на голый Beget-IP. Решение после зелёного теста web.
+- W-SEC XFF: когда API пойдёт за edge (Фаза 2) — учесть CDN-хоп в trusted-proxy модели.
+
+### Активно: M8 mobile visual parity (поверх M7 @ 9139191)
+- **База была:** `9139191` (M7). Ветка: **`feat/m8-mobile-visual-parity`** @ **`779f20d`** (pushed; M7+M8+M8-9).
+- **STOP-1 — ACCEPT. STOP-2 — ACCEPT. STOP-3 staging — DEPLOYED** (базовый M8 @ `da11764`); M8-9 badges @ `779f20d` — нужен pull+rebuild staging если ещё не обновляли.
+- **M8-9 (header badges) — ACCEPT** (`2026-07-31-01`) @ `779f20d`.
+- **Ожидает:** ручной гейт Василия → **merge в `main`** (сейчас `main` = `e7b5318`). Один merge закрывает M7+M8+M8-9 (DEP-051+052).
+
+### Параллельно: admin upload 15MB + RU errors
+- **ACCEPT** промпт `2026-07-31-02`, ветка **`fix/admin-ru-errors-upload-15mb`** (uncommitted поверх `e208323`).
+- Upload CRM/content: **15 MB**; nginx conf **16m**; `parseApiJson` (Safari empty body); `z.config(ru())`; CRM/admin-auth глоссарий → RU.
+- Verify оркестратора: tsc backend ✅, vitest **80/525** ✅, admin `tsc -b` ✅.
+- Soft: EN ещё в legacy Mini App admin (`admin-orders` / `admin-promo-codes` / `admin-product-dims` / sync-сообщения в `routes/admin.ts`) — не React CRM.
+- **Pending:** commit → merge `master` → deploy backend+admin + **nginx reload** (иначе лимит тела останется 12m). DEP-053.
+
+| Пункт | Суть | Статус |
+|---|---|---|
+| M8-0 | rail priority=false; console.error; Suspense min-h | done |
+| M8-1 | ATC full bar E2; dots bottom-4; old T1 removed | done |
+| M8-2 | Breadcrumbs back-link mobile | done |
+| M8-3 | h1 caps + compress; T6' raw 154 | done |
+| M8-4 | Banner stacked mobile / overlay desktop | done |
+| M8-5 | Rail after CMS «Новинки» | done |
+| M8-6 | Footer max-lg parity | done |
+| M8-7 | Menu uppercase + bg | done |
+| M8-8 | Search → right icon group | done |
+| M8-9 | Header cart/fav badges: round compact | done @ `779f20d` |
+
+### Staging / merge: M7 mobile visual polish
+- M7 @ `9139191` **включён** в `feat/m8-mobile-visual-parity` @ `da11764` (отдельный merge M7 не нужен — мержить M8-ветку).
+- Docs M7: `DECISIONS.md` M7-V4/V7/4/3/T6.
+
+### Закрыто: фаза URL (S0–S4 + D2–D6)
+- Prod BE `e208323`, SF tip **`e7b5318`** (DEP-049/050). **Фаза URL CLOSED.**
+
+<details>
+<summary>Детали S0–S4.1 (свёрнуто)</summary>
+
+Цель: убрать рассинхрон URL, soft-404 и хардкод-таксономию до миграции домена. Порядок S0→S4, backend-first, staging-гейт абсолютный.
+
+- **S0** — ВЫПОЛНЕН: [`URL_MIGRATION_AUDIT.md`](URL_MIGRATION_AUDIT.md).
+- **S1** — MERGED `origin/master` @ `e208323`.
+- **S2** — ACCEPT @ `b281301`.
+- **S3** — ACCEPT @ `47903bc`.
+- **S4 staging/prod** — DEP-049 CLOSED.
+- **S4.1 D2–D6** — DEP-050 CLOSED @ `e7b5318`.
+
+</details>
+
+### Активно: после Mobile M0–M6
+- **Mobile M0–M6 — DEPLOYED** в истории tip (сейчас tip = `e7b5318` = Mobile + URL). DEP-048 ✅.
+
+### Параллельный ops
+- **Catalog parity audit** — DONE; артефакты локально, **не** в git без явного go. Next: CRM import REAL.
+- **Admin sidebar «Товары»** — ACCEPT `09`, uncommitted.
+- **DEP-045** home visual — deferred (M7-4 desktop novinki тоже туда).
 - W soft-list / W5 SMS; PM2 `instances:1`.
 
 ### Закрыто в сессии 45: Mobile adaptation M0–M6
@@ -539,6 +606,11 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-046 | **W-SEC hardening** SEC-1…5 | BE `69c83aa` + SF `4d06417` | verified | **deployed** ✅ | — | staging+prod API+BFF G-SEC GREEN 2026-07-28 |
 | DEP-047 | **Nav accent:** top-nav «Новинки» + catalog drawer «Распродажа» → `text-brand` | `muru-storefront` / `main` (`99db9c3`) | verified | **deployed** (в составе DEP-048) | — | tip `516b5b7` |
 | DEP-048 | **Mobile adaptation M0–M6** | `muru-storefront` / `main` (`516b5b7`) | verified | **deployed** ✅ (2026-07-28) | VPS pull+build+restart | curl home/catalog 200; PM2 ↺125 |
+| DEP-049 | **URL latin slugs S0–S4** | BE `e208323` + SF `47903bc` | verified | **deployed** ✅ (2026-07-28) | prod 032/033+backfill; SF API→prod | Mini App smoke + Webmaster later |
+| DEP-050 | **URL S4.1 D2–D6:** podarochnye-karty 301, proxy 1-hop/case, X-Robots-Tag, identity gate | `muru-storefront` / `main` (`e7b5318`) | verified | **deployed** ✅ (2026-07-29) | pull+build+restart; BE not deployed | identity 35/35; web.murushop.ru gate green |
+| DEP-051 | **M7 mobile visual polish** M7-1…6 | `muru-storefront` / `feat/m7-mobile-visual-polish` (`9139191`) | verified | **staging** @ web.murushop.ru; **main не merged** | merge main → VPS checkout main | ждёт go на merge |
+| DEP-052 | **M8 mobile visual parity** M8-0…8 | `muru-storefront` / `feat/m8-mobile-visual-parity` | STOP-2 ACCEPT | pending staging | commit+push → VPS branch → build | после гейта → merge |
+| DEP-053 | **Admin:** upload 15 MB + RU CRM errors + nginx 16m + Safari JSON parse | `muru-backend-local` / `fix/admin-ru-errors-upload-15mb` | ACCEPT (uncommitted) | pending | commit → merge master → deploy.sh + sync-nginx | без миграций; soft: legacy TG-admin EN |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -586,6 +658,18 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-07-31 (сессия 51):** ACCEPT `2026-07-31-02` admin RU + upload 15MB (`fix/admin-ru-errors-upload-15mb`, uncommitted). tsc+vitest 525+admin tsc OK. M8-9 уже @ `779f20d`. Next: commit/merge DEP-053 + nginx; гейт merge M8.
+- **2026-07-31 (сессия 51 M8-9):** M8-9 header badges ACCEPT (`2026-07-31-01`). Diff 2 файла; `badgeClass` = `h-4 min-w-4 rounded-full text-[10px]`; MiniCart импортирует общий класс; `tsc` чисто. Pushed `779f20d`.
+- **2026-07-30 (сессия 50 STOP-2 ACCEPT):** M8-0…8 verified uncommitted. Gates green (tap after ATC 36px allow-list; T8 after visible-heading pick). T6' raw 154. Next: commit → staging STOP-3 → merge decision. Docs DECISIONS M8-V1-REVERSAL / M8-5 + BACKLOG — в патче docs.
+- **2026-07-30 (сессия 50 STOP-1 ACCEPT):** M8 baseline verified. V1 ATC на muru.ru подтверждён. E1–E5 в `docs/m8-parity-extract.md`. Red: T1'/T6'/T7/T9-m; green: T8/T9-d. Промпт `2026-07-30-02-m8-impl`. Clarification: ATC E2 height **36px**/14px (не слепо py-3≈48); dots эталон bottom **16px** — сверить с «bottom-12» надзора, брать E2; Favorite 20×20 — вне scope.
+- **2026-07-30 (сессия 50 kickoff M8):** Надзорный промпт M8 принят. V1-REVERSAL: у muru.ru mobile есть полоса ATC → откат M7-1 в M8-1. База `9139191` (M7 не в main) → ветка от `feat/m7`. Разбить: STOP-1 first. Промпт `2026-07-30-01-m8-stop1`. DEP-052 pending.
+- **2026-07-29 (сессия 49 STOP-2 ACCEPT):** M7-1…6 verified uncommitted on `feat/m7-mobile-visual-polish`. Gates: tsc, vitest 53, T1–T6, overflow/tap/ios-zoom/a11y. T6 → effective gap (DECISIONS M7-T6). Missing shots PDP/scroll soft. Docs DECISIONS+BACKLOG. Next: staging STOP-3, затем merge.
+- **2026-07-29 (сессия 49 STOP-1 ACCEPT):** M7 baseline verified @ `feat/m7-mobile-visual-polish` / `e7b5318`. Env prod API. A–G + T1–T5 red / T6 green. Clarification → impl: T1 assertion must use *visible* text (not `textContent`) because M7-1 keeps desktop label in DOM via `hidden lg:inline`. Sticky top: **не** `var(--header-height)` (170px desktop) — брать фактическую мобильную шапку `h-14` + `pt-safe-header`. Промпт `2026-07-29-02-m7-impl`.
+- **2026-07-29 (сессия 49 kickoff M7):** Надзорный промпт M7 принят. Решение: **разбить** — сначала только STOP-1 (`2026-07-29-01-m7-stop1`), без правок продукта. База `e7b5318`, ветка `feat/m7-mobile-visual-polish`. После ACCEPT → M7-1…6 отдельным промптом (или двумя), затем STOP-2 / staging STOP-3. Вводные V4/V7 не перепроверять.
+- **2026-07-29 (сессия 48 CLOSE URL S4.1):** **DEP-050 CLOSED.** SF `e7b5318` на `web.murushop.ru`. D1 false positive; D2–D5 live; identity 35/35; gate green. `murushop.ru` ≠ SF (Mini App SPA) — e2e только на `web.murushop.ru`. Фаза URL CLOSED. BE не трогали.
+- **2026-07-29 (сессия 48 kickoff):** URL S4.1. D1 опровергнут. DECISIONS/LESSONS. Промпты `01`…`03`.
+- **2026-07-28 (сессия 47 CLOSE URL):** **DEP-049 CLOSED**. Prod BE `e208323` + SF `47903bc` на `murushop.ru/api`. Gate green. Mini App smoke OK (Василий). Soft: CMS static fallback; Webmaster при cutover.
+- **2026-07-28 (сессия 47, URL S4 prod BE):** **ACCEPT** prod BE `/var/www/muru` @ `e208323`: dump OK; 032; backfill 265→0; 033; tree cyrillic []; health/by-slug MU0005 OK.
 - **2026-07-28 (сессия 45, DEP-048 deployed):** VPS `/var/www/muru-storefront` @ `516b5b7`; build OK; pm2 restart; curl `/` `/catalog/` `/catalog/vazy-i-aksessuary/` → 200. DEP-047 закрыт вместе с tip. Аудит parity в docs — не коммитили.
 - **2026-07-28 (сессия 45 CLOSE Mobile):** **ACCEPT `2026-07-28-17-m6`** @ `516b5b7` — эпик M0–M6 **CLOSED** (code). Gate vs M0: overflow 14→0, zoom 5→0, tap ~190→0. Merged+pushed `origin/main`.
 - **2026-07-28 (сессия 45, ACCEPT M5 → M6):** **ACCEPT `2026-07-28-16-m5`** @ `51a8e5b`. Verify: basket fixed summary+pb-safe+qty size-11; checkout sticky pay; CDEK map min-w-0 overflow; account horizontal nav; auth inputMode+login min-h-11; captcha wrap; tsc clean; overflow 0 all routes; tap 153. Soft: account скрины = login redirect; YooKassa redirect N/A. Выдан **`2026-07-28-17-m6`** (финал).
