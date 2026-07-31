@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-31 (сессия 51: DEP-054 banner video CLOSED — smoke OK)
+Последнее обновление: 2026-07-31 (сессия 51: SF merge gate CLOSED — main @ 459eb90)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -135,23 +135,21 @@
 - W-SEC XFF: когда API пойдёт за edge (Фаза 2) — учесть CDN-хоп в trusted-proxy модели.
 
 ### Активно: M8 mobile visual parity (поверх M7 @ 9139191)
-- **База была:** `9139191` (M7). Ветка: **`feat/m8-mobile-visual-parity`** @ **`779f20d`** (pushed; M7+M8+M8-9).
-- **STOP-1 — ACCEPT. STOP-2 — ACCEPT. STOP-3 staging — DEPLOYED** (базовый M8 @ `da11764`); M8-9 badges @ `779f20d` — нужен pull+rebuild staging если ещё не обновляли.
-- **M8-9 (header badges) — ACCEPT** (`2026-07-31-01`) @ `779f20d`.
-- **Ожидает:** ручной гейт Василия → **merge в `main`** (сейчас `main` = `e7b5318`). Один merge закрывает M7+M8+M8-9 (DEP-051+052).
+- **MERGED → `main` @ `459eb90`** (2026-07-31): FF `feat/banner-video-sf` → `origin/main` (M7+M8+M8-9+kitchen+collections+banner video).
+- Было staging на feature; **VPS:** переключить `/var/www/muru-storefront` на `main` @ `459eb90` (если ещё на feature-ветке).
+- DEP-051/052 merge gate **закрыт**; tip включает video (DEP-054 SF).
 
 ### Параллельно: admin upload 15MB + RU errors
 - **DEPLOYED** `2026-07-31-02` @ **`ff8fddc`** на `/var/www/muru` (master); nginx **16m** verified; health 200. DEP-053 closed.
 
 ### Закрыто: video в баннерах главной (DEP-054)
-- **DEPLOYED + smoke OK** (2026-07-31): BE `8e146b9` (ffmpeg upload-video, admin Фото|Видео, nginx 64m, migrate `034`); SF `feat/banner-video-sf` на `web.murushop.ru` (`<video>` + reduced-motion poster). Оператор: video на главной работает.
-- `main` SF **не** merged (ветка поверх M8 `51e944a`); merge в `main` — вместе с гейтом M7/M8.
+- **DEPLOYED + smoke OK** (2026-07-31): BE `8e146b9`; SF теперь на **`main` @ `459eb90`** (после FF merge).
+- VPS staging: checkout `main` если ещё `feat/banner-video-sf`.
 
 ### Баги витрины (диагностика 2026-07-31)
-1. **Кухня hub → listing:** **ACCEPT + STAGING** `2026-07-31-03` @ `51e944a` на `web.murushop.ru` (`feat/m8-mobile-visual-parity`).
-2. **Коллекции пустые:** **ACCEPT + STAGING** `2026-07-31-04` в том же `51e944a`.
-- VPS SF tip **`51e944a`** (pull+build+pm2 OK). Soft build: static fallback 404 для CMS pages/collections не из CRM (ожидаемо).
-- **Next:** ручной смоук → гейт merge M7+M8+фиксы в `main`.
+1. **Кухня hub → listing:** **ACCEPT** @ `51e944a` → в `main` `459eb90`.
+2. **Коллекции пустые:** **ACCEPT** @ `51e944a` → в `main` `459eb90`.
+- **Next:** VPS `git checkout main && pull` + rebuild (если tip ещё feature).
 
 | Пункт | Суть | Статус |
 |---|---|---|
@@ -614,10 +612,10 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-048 | **Mobile adaptation M0–M6** | `muru-storefront` / `main` (`516b5b7`) | verified | **deployed** ✅ (2026-07-28) | VPS pull+build+restart | curl home/catalog 200; PM2 ↺125 |
 | DEP-049 | **URL latin slugs S0–S4** | BE `e208323` + SF `47903bc` | verified | **deployed** ✅ (2026-07-28) | prod 032/033+backfill; SF API→prod | Mini App smoke + Webmaster later |
 | DEP-050 | **URL S4.1 D2–D6:** podarochnye-karty 301, proxy 1-hop/case, X-Robots-Tag, identity gate | `muru-storefront` / `main` (`e7b5318`) | verified | **deployed** ✅ (2026-07-29) | pull+build+restart; BE not deployed | identity 35/35; web.murushop.ru gate green |
-| DEP-051 | **M7 mobile visual polish** M7-1…6 | `muru-storefront` / `feat/m7-mobile-visual-polish` (`9139191`) | verified | **staging** @ web.murushop.ru; **main не merged** | merge main → VPS checkout main | ждёт go на merge |
-| DEP-052 | **M8 mobile visual parity** M8-0…8 | `muru-storefront` / `feat/m8-mobile-visual-parity` | STOP-2 ACCEPT | pending staging | commit+push → VPS branch → build | после гейта → merge |
+| DEP-051 | **M7 mobile visual polish** M7-1…6 | `muru-storefront` / `main` (`459eb90`) | verified | **merged** ✅ (2026-07-31); VPS confirm checkout main | FF feat/banner-video-sf → main | includes M8+video tip |
+| DEP-052 | **M8 mobile visual parity** M8-0…9 | `muru-storefront` / `main` (`459eb90`) | verified | **merged** ✅ (2026-07-31); staging was feature | VPS → `main` @ `459eb90` rebuild | badges M8-9 included |
 | DEP-053 | **Admin:** upload 15 MB + RU CRM errors + nginx 16m + Safari JSON parse | `muru-backend-local` / `master` (`ff8fddc`) | ACCEPT | **deployed** ✅ (2026-07-31) | FF merge + deploy.sh + sync-nginx; `client_max_body_size 16m` verified | soft: legacy TG-admin EN |
-| DEP-054 | **Home banner video:** migration `034` + ffmpeg upload + admin UI + SF `<video>` + nginx 64m | BE `8e146b9` + SF `feat/banner-video-sf` | ACCEPT | **deployed** ✅ smoke OK (2026-07-31) | apt ffmpeg; psql 034; deploy.sh; sync-nginx 64m; SF rebuild | video на главной подтверждён оператором |
+| DEP-054 | **Home banner video:** migration `034` + ffmpeg upload + admin UI + SF `<video>` + nginx 64m | BE `8e146b9` + SF `main` `459eb90` | ACCEPT | **deployed** ✅ smoke OK; **SF merged to main** (2026-07-31) | apt ffmpeg; psql 034; deploy.sh; sync-nginx 64m; SF rebuild | video на главной подтверждён; VPS → checkout main |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -665,6 +663,7 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-07-31 (сессия 51 MERGE GATE):** FF `feat/banner-video-sf` → `origin/main` @ **`459eb90`** (5 commits: M7+M8+M8-9+kitchen/collections+video). DEP-051/052 merge closed. Next: VPS checkout `main` + rebuild если ещё на feature.
 - **2026-07-31 (сессия 51 CLOSE DEP-054):** Banner video **LIVE**. BE `8e146b9`, SF `feat/banner-video-sf` на web; migrate 034; nginx 64m; ffmpeg; smoke оператора OK. Урок: migrate **после** `git pull` (первый psql 034 failed — файла ещё не было → banners 500 `column video does not exist`). Handoff надзору — отчёт в чате.
 - **2026-07-31 (сессия 51 ACCEPT banner-video SF):** **ACCEPT `2026-07-31-07`**. Verify: schema+resolveBanner; HomeBannerMedia muted/loop/playsInline/autoPlay object-cover; reduced-motion default true; page passes video; base `51e944a`; tsc OK. Soft: краткий poster→video upgrade; дубль hook vs product-card. Выдан **`2026-07-31-08`** DEP-054 ops.
 - **2026-07-31 (сессия 51 ACCEPT banner-video Admin):** **ACCEPT `2026-07-31-06`**. Verify: uploadVideo+parseApiJson; media UX; Save `{image,video}`; wipe-баг закрыт; tsc OK. Soft: вкладка Фото ≠ clear video. Выдан **`2026-07-31-07`** (storefront).
