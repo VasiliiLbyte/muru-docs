@@ -140,3 +140,19 @@ YC CDN (инфраструктура на сети Gcore, RF-POP присутс�
 **Status:** Accepted (scope-гейт).
 
 Фаза 1: за CDN только `web`. Apex `murushop.ru` (API `/api/*`, `/img/*`, uploads), `www`, `api-staging` остаются на прямых A-записях — их дубль-A НЕ трогать при cutover web. Фаза 2 (перевод apex/API за edge) — отдельное решение; обязательное условие: пересмотр W-SEC trusted-proxy модели с учётом нового CDN-хопа в XFF-цепочке.
+
+---
+
+## SET-001 (2026-08-01) — Settings secrets: variant A (env only)
+
+**Status:** Accepted. Deployed DEP-055 (`f75656f`).
+
+Несекретные поля CDEK/YooKassa (from_location, package defaults, VAT/tax system, shopId **read-only display**) живут в `site_settings` + `runtime-config.service` = `DB ?? env`. **Секреты** (`CDEK_CLIENT_SECRET`, `YOOKASSA_SECRET_KEY`, …) — **только env**; никогда в API JSON / admin forms. Перенос секретов в БД — отдельное решение (не этот epic).
+
+---
+
+## SET-002 (2026-08-01) — Legal docs via `content_pages` + `LEGAL_DOC_SLUGS`
+
+**Status:** Accepted. Deployed DEP-055.
+
+Юридические страницы (`privacy|offer|delivery|refund|terms|consent`) — не отдельная таблица; allowlist `LEGAL_DOC_SLUGS` с тем же upsert/get, что fixed pages. Admin: Settings → Документы → FixedPageEdit. Storefront routes `/help/*`, `/legal/*` читают CMS с static fallback.

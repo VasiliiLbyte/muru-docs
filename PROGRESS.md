@@ -108,9 +108,16 @@
 - **Контакты/Клиентам visual + CMS — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпты `2026-07-16-10` + `10b`, `@ 1db2365`): contacts/help visual; DEP-037.
 - **Admin fixed tabs Клиентам/Контакты — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-11`, `@ 27256b2`, **ahead origin**): убрана вкладка «Страницы»; GET/PUT `pages/by-slug/:slug` allowlist help|contacts; FixedPageEditPage. Verify: tsc + service tests OK; route 401 = sandbox EPERM.
 
-**Storefront tip:** VPS `/var/www/muru-storefront` @ **`47903bc`**, API=`https://murushop.ru/api`, `NOINDEX=true`. **Backend tip:** prod `/var/www/muru` @ **`e208323`** (032/033+backfill).
+**Storefront tip:** VPS `/var/www/muru-storefront` @ **`4795b25`** (`main`), API=`https://murushop.ru/api`, `NOINDEX=true`. **Backend tip:** prod `/var/www/muru` @ **`f75656f`** (`master`; 035/036 applied).
 
 ## Следующее
+
+### Закрыто: EPIC Settings — DEP-055 **DEPLOYED** (2026-08-01)
+- STOP-4 staging-first → merge → prod: BE/admin `master` **`f75656f`** (+ test fix **`0eb8ba9`**, ahead origin), SF `main` **`4795b25`**.
+- Migrate **035**+**036** на `muru_staging` затем `muru_db`; `deploy.sh` + SF rebuild; smoke: health 200, `site-contacts`/`requisites` JSON, CRM settings **401** без cookie.
+- **Operator manual QA GREEN** (2026-08-01): admin Settings (contacts/docs/requisites/CDEK/YK), витрина contacts/requisites/legal/help, web checkout CDEK+YK, Mini App — OK.
+- **Test follow-up CLOSED** (`2026-08-01-12` @ `0eb8ba9`): invoice env mock expanded for runtime-config; vitest **562 passed / 0 failed / 1 skipped**; deploy не нужен. Push `master` — по желанию.
+- Soon в хабе: SEO / Уведомления.
 
 ### Активно: RF-доступность (эпик CDN) — cutover web.murushop.ru PENDING
 Хронология мер (все вероятностные, диагноз ТСПУ — см. `DECISIONS.md` RF-001…RF-005):
@@ -616,6 +623,7 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-052 | **M8 mobile visual parity** M8-0…9 | `muru-storefront` / `main` (`459eb90`) | verified | **merged** ✅ (2026-07-31); staging was feature | VPS → `main` @ `459eb90` rebuild | badges M8-9 included |
 | DEP-053 | **Admin:** upload 15 MB + RU CRM errors + nginx 16m + Safari JSON parse | `muru-backend-local` / `master` (`ff8fddc`) | ACCEPT | **deployed** ✅ (2026-07-31) | FF merge + deploy.sh + sync-nginx; `client_max_body_size 16m` verified | soft: legacy TG-admin EN |
 | DEP-054 | **Home banner video:** migration `034` + ffmpeg upload + admin UI + SF `<video>` + nginx 64m | BE `8e146b9` + SF `main` `459eb90` | ACCEPT | **deployed** ✅ smoke OK; **SF merged to main** (2026-07-31) | apt ffmpeg; psql 034; deploy.sh; sync-nginx 64m; SF rebuild | video на главной подтверждён; VPS → checkout main |
+| DEP-055 | **EPIC Settings:** `site_settings` 035/036, CRM settings hub, public site-contacts/requisites, runtime-config CDEK/YK, SF contacts/legal/requisites | BE `f75656f` + SF `4795b25` | ACCEPT | **deployed** ✅ (2026-08-01) | staging 035→036 → prod migrate+deploy.sh; SF FF→main + rebuild | secrets stay in env (SET-001); legal via content_pages (SET-002) |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -663,6 +671,8 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-08-01 (сессия Settings CLOSE + test fix):** DEP-055 deployed + QA GREEN. Test-only `0eb8ba9` — invoice env mock для runtime-config; vitest 562/0 fail; tsc OK; deploy не нужен. Push master optional.
+- **2026-08-01 (сессия Settings CLOSE):** **DEP-055 deployed + operator QA GREEN.** Staging → prod migrate 035/036; BE `f75656f` (PM2 ↺13); SF merge →`main` `4795b25`, VPS rebuild (PM2 ↺140). Smoke API + ручной фронт (admin/SF/checkout/Mini App) OK. Инцидент: VPS `checkout main` в `/var/www/muru` — откат на `master` @ `f75656f`. Docs: SET-001/002, API_CONTRACT, надзорный отчёт.
 - **2026-07-31 (сессия 51 MERGE GATE):** FF `feat/banner-video-sf` → `origin/main` @ **`459eb90`** (5 commits: M7+M8+M8-9+kitchen/collections+video). DEP-051/052 merge closed. Next: VPS checkout `main` + rebuild если ещё на feature.
 - **2026-07-31 (сессия 51 CLOSE DEP-054):** Banner video **LIVE**. BE `8e146b9`, SF `feat/banner-video-sf` на web; migrate 034; nginx 64m; ffmpeg; smoke оператора OK. Урок: migrate **после** `git pull` (первый psql 034 failed — файла ещё не было → banners 500 `column video does not exist`). Handoff надзору — отчёт в чате.
 - **2026-07-31 (сессия 51 ACCEPT banner-video SF):** **ACCEPT `2026-07-31-07`**. Verify: schema+resolveBanner; HomeBannerMedia muted/loop/playsInline/autoPlay object-cover; reduced-motion default true; page passes video; base `51e944a`; tsc OK. Soft: краткий poster→video upgrade; дубль hook vs product-card. Выдан **`2026-07-31-08`** DEP-054 ops.

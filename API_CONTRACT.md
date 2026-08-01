@@ -2,7 +2,7 @@
 
 Единый контракт между **каноническим бэкендом** (`muru-backend-local`, порт `4000`) и **витриной** (`muru-storefront`).
 
-**Версия:** 2026-07-04  
+**Версия:** 2026-08-01  
 **Источник правды в коде:** `muru-backend-local/backend/src`, `muru-storefront/src/lib/api`, `muru-storefront/src/lib/schemas`
 
 При изменении эндпоинтов или полей — обновлять этот файл **и** `PROGRESS.md` (лог сессии).
@@ -87,7 +87,18 @@
 |---|---|---|
 | `getProductBySku()` → `fetchCatalogProductBySku(sku)` | `GET /api/catalog/products/:sku` | ✅ При `NEXT_PUBLIC_API_BASE` (или `NEXT_PUBLIC_CATALOG_API_BASE`) каталог-бэкенд включён; SKU нормализуется `trim().toUpperCase()`. MSW `GET /products/by-sku/:sku` — только dev-fallback без API_BASE. |
 
-Контент (collections, lookbooks, static pages) — **не API**, статика в `muru-storefront/src/lib/content/`.
+Контент CMS (pages, collections, lookbooks, banners) — `/api/content/*` с graceful fallback на статику в `muru-storefront/src/lib/content/` при 404/ошибке.
+
+### Site settings (публичные, additive 2026-08-01)
+
+Префикс: `/api/content` · Auth: **нет** · Источник: таблица `site_settings` (migrations 035/036).
+
+| Метод | Путь | Storefront | Описание |
+|---|---|---|---|
+| `GET` | `/site-contacts` | `getSiteContacts()` | Телефон/email/адрес/часы/карта; null → SF per-field fallback |
+| `GET` | `/requisites` | `getRequisites()` | Юр. реквизиты для `/company/requisites`; null → fallback |
+
+Секреты CDEK/YooKassa **никогда** не в публичном JSON. CRM owner: `/api/crm/settings/*` (contacts, requisites, cdek, yookassa, integrations-status) — cookie JWT. Legal docs (`privacy|offer|delivery|refund|terms|consent`) — через существующий `content_pages` / FixedPage upsert (`LEGAL_DOC_SLUGS`).
 
 ---
 
