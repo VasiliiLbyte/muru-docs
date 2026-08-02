@@ -156,3 +156,39 @@ YC CDN (инфраструктура на сети Gcore, RF-POP присутс�
 **Status:** Accepted. Deployed DEP-055.
 
 Юридические страницы (`privacy|offer|delivery|refund|terms|consent`) — не отдельная таблица; allowlist `LEGAL_DOC_SLUGS` с тем же upsert/get, что fixed pages. Admin: Settings → Документы → FixedPageEdit. Storefront routes `/help/*`, `/legal/*` читают CMS с static fallback.
+
+
+---
+
+## PRICE-001 (2026-08-02) — Канон цены: price = LIST, sale вычисляется
+
+**Status:** Accepted. Deployed (BE master a215bfb + mig `039_price_list_restore.sql` [21 SKU], SF adaptProduct list→sale). Восстановлено в доках 2026-08-03 после doc-drift.
+
+**Симптом:** checkout UI ~1440+420, ЮKassa считала 1572. **Root cause** (подтверждён payments snapshot): `discount_percent=20` применялся к уже «sale»-цене, лежавшей в `products.price` (1440×0.8=1152)+420=1572.
+
+**Канон:**
+- `products.price` = LIST (полная цена без скидки).
+- `sale = round(list × (1 − d/100), 2)`; оплата — по той же формуле.
+- Admin: поле «Цена без скидки» + preview «со скидкой».
+- Storefront и Mini App отображают sale.
+- Пример: MU0182 price=1800, discount=20 → sale=1440.
+
+**Soft:** миграция 039 НЕ идемпотентна — повторно не гонять. Deploy order (урок инцидента): BE tip + миграция → deploy.sh → SF (иначе SF раньше BE даёт кратковременный неверный показ ~1152).
+
+---
+
+## STK-001 (2026-08-02) — Механизм склада: списание при оплате + единый журнал движений
+
+**Status:** Accepted. Deployed DEP-056. Восстановлено в доках 2026-08-03 после doc-drift (аппенд был не закоммичен и снесён `reset --hard`).
+
+**Момент списания (реш. 1):** сток списывается в момент успешной оплаты — заказ и создаётся при оплате (`completeOrderAfterPayment → createOrder`, декремент в той же транзакции). Резерва до оплаты нет. Идемпотентно по построению (createOrder на оплаченный заказ — один раз, привязка платежа атомарна).
+
+**Оверселл (реш. 2):** между валидацией наличия и оплатой сток не резервируется; `GREATEST(0, …)` не даёт минус. Принято как есть при текущем трафике; резерв — будущая доработка.
+
+**Журнал `stock_movements` + `applyStockDelta`:** таблица (product_id + снапшот sku/name, delta знаковое, type sale/return/adjustment, reason, order_id, stock_before/after, actor). Единый хелпер `applyStockDelta(client,…)` внутри транзакции; переведены все точки: декремент в createOrder, orphan-возврат, ручная правка стока. Импорт/синх НЕ логируется (реш. 3).
+
+**Возврат и статусы (реш. 4):** terminal = {Отменён, Возврат}. Централизованный `settleOrderStockOnStatusChange` на переход в terminal из нетерминала — из всех путей (cancel, PATCH, рефанд-вебхук), в одной транзакции; идемпотентность по журналу (нет повторного `return` по order_id). Исправлена ловушка: раньше PATCH-статус на «Возврат» сток не возвращал.
+
+**Авто-рефанд (реш. 4):** вебхук ЮKassa `refund.succeeded` — полный рефанд → статус «Возврат» + возврат стока + сигнал в бот; частичный → только сигнал. Реализовано в DEP-056 (`refund-webhook.service.ts`).
+
+**Админка:** страница «Склад → Движения» (фильтры товар/тип/даты, пагинация).
