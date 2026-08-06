@@ -192,3 +192,92 @@ YC CDN (инфраструктура на сети Gcore, RF-POP присутс�
 **Авто-рефанд (реш. 4):** вебхук ЮKassa `refund.succeeded` — полный рефанд → статус «Возврат» + возврат стока + сигнал в бот; частичный → только сигнал. Реализовано в DEP-056 (`refund-webhook.service.ts`).
 
 **Админка:** страница «Склад → Движения» (фильтры товар/тип/даты, пагинация).
+
+---
+
+## YK-001 (2026-08-04) — Mini App YooKassa open latency: ACCEPTABLE / deferred
+
+**Status:** Accepted (operator gate close). Phase B instrumentation **not** shipped.
+
+**Symptom:** Mini App pay succeeds but transition to YooKassa felt slower than web.
+
+**Phase A evidence (prod 2026-08-04):**
+- Handler: `POST /api/payments/invoice` → 200 (not `/create` / `/web/create`).
+- Stopwatch click → native sheet: **1.51 / 1.69 / 1.92 s** (≈1.7 s p50); YK UI may still load after sheet (client).
+- H5: MainButton has no progress copy; can feel like a double-press.
+- Web stopwatch skipped (operator: muru.ru already feels fast).
+- nginx access has no `$request_time` stage split; code has no `[pay-timing]` logs.
+
+**Static path:** `openInvoice` only after `await createInvoice` → server `computeTrustedPricing` (+CDEK if delivery) → `createInvoiceLink` (Telegram). Sequential external RTTs expected.
+
+**Decision:** Treat current ~1.5–2 s as **ACCEPTABLE** for now. No payment-logic change. No Phase B deploy.
+
+**Reopen if latency regresses / complaints return:**
+1. `.tasks/2026-08-04-YK-MA-LATENCY-PHASE-A-RUNBOOK.md`
+2. After go: `.tasks/2026-08-04-YK-MA-LATENCY-PHASE-B.prompt.md` (`[pay-timing]`, then revert)
+3. Soft UX candidate (low risk): MainButton progress while `isSubmitting` (F1) — separate prompt, not part of this close.
+
+---
+
+## AUTH-001 (2026-08-04) — Переход на phone-first passwordless (SMS OTP через sms.ru)
+
+**Status:** Accepted (решения Василия 2026-08-04). Реализация — эпик backend-first, staging-first. Спека: [`.tasks/2026-08-04-AUTH-PHONE-OTP-EPIC.md`](.tasks/2026-08-04-AUTH-PHONE-OTP-EPIC.md).
+
+**Продуктовые решения:**
+1. **Delivery:** SMS-код (наш OTP через sms.ru `sms/send`), UX как Ozon/WB/Lamoda. `callcheck` (звонок) — возможное удешевление позже, не сейчас.
+2. **Model:** Passwordless — только OTP. Пароль убираем (`password_hash` → nullable/удаляется, forgot/reset/login-by-password снимаются).
+3. **Identity:** `phone` = основной логин (UNIQUE, NOT NULL, нормализованный RU). JWT/refresh модель без изменений (payload `customerId`).
+4. **Email:**
+   - Web-**checkout**: email **обязателен** (на него уходит подтверждение заказа).
+   - Гостевой заказ (без явной регистрации): собираем email + подтверждаем телефон по OTP → **де-факто создаётся кабинет** (phone verified, email сохранён, заказ привязан).
+   - **Mini App:** обязателен только телефон; email не требуется (identity через Telegram, путь `telegramAuthHandler` не трогаем).
+   - На уровне БД `email` — nullable (обязательность email на checkout — прикладная, не constraint).
+5. **Миграция:** боевая клиентская база практически пуста → **данные не мигрируем**; схему пересобираем под phone-first (031 расширяем миграцией, не переписываем историю).
+
+**Провайдер sms.ru — предпосылки (operator, внешний lead-time, стартовать параллельно с кодом):**
+- Внести реквизиты; создать **буквенного отправителя** (напр. `MURU`); **согласовать у операторов** (дни) — без него `sms/send` = ошибка **221**.
+- Поднять **дневной лимит** (сейчас 0/10) под боевой трафик; пополнить баланс.
+- Секреты в env: `SMSRU_API_ID`, `SMSRU_SENDER`, `SMSRU_TEST_MODE` (dev/staging = `test=1`, без списания/без реального отправителя). Ключ в чат/доки открытым текстом не писать (SET-001).
+
+**Антифрод:** свой rate-limit по phone+IP + cooldown resend + лимит попыток ввода; передавать `ip` конечного пользователя в sms.ru; переиспользовать SmartCaptcha (порог как в W-SEC). Встроенные лимиты sms.ru (233/505/etc) — как второй эшелон.
+
+**Reopen/следующее:** декомпозиция и статус фаз — в спеке эпика и PROGRESS.
+
+---
+
+## IMPORT-001 (2026-08-06) — Bulk-импорт товаров из шаблона (.xlsx) в админке
+
+**Status:** Accepted (решения Василия 2026-08-06). **P1+P2 ACCEPT** @ `feature/import-p2-admin` `a9b40ac` (BE `d54f53c` + mig 041). Deploy **DEP-062 STOP** staging-first. Reports: P1/P2 в `.tasks/`.
+
+**Что:** новая вкладка «Импорт» в разделе «Товары» админки: скачать шаблон .xlsx → заполнить → загрузить → предпросмотр → подтвердить → импорт; плюс лог импортов. Отдельный **чистый** шаблон, НЕ legacy google-формат (тот остаётся для google-sync).
+
+**Колонки шаблона (только «база»; категории/подкатегории/фото/коллекции — из админки, НЕ из файла):**
+| Колонка | Поле | Правило |
+|---|---|---|
+| Артикул* | `sku` | обязателен, уникален |
+| Наименование* | `name` | обязателен |
+| Стоимость, ₽* | `price` | LIST-цена (PRICE-001), RU-число `3 500,00` |
+| Остаток* | `in_stock` | целое ≥ 0 (RU `2,00`→2) |
+| Цвет | `color` | + дублировать в `specs['Цвет']` (как admin) |
+| Размер | `size` | ярлык; + `specs['Размер']` |
+| Описание | `description` | |
+| Бренд | `specs['Бренд']` | |
+| Материал | `specs['Материал']` | |
+| Страна | `specs['Страна производитель']` | канон admin-ключ |
+| Скидка % | `discount_percent` | 0–100 |
+
+Вес/габариты в шаблон **не входят** → дефолты (3000г / 22×12×18), правятся в админке.
+
+**Решения по логике:**
+1. **Дубли SKU:** режим на выбор при импорте — `mode = new` (дубль → ошибка строки, существующий товар не трогаем) или `mode = upsert` (обновить поля существующего).
+2. **Ошибки:** частичный импорт — валидные строки пишутся, невалидные → в лог с `row#` + причиной. Не атомарно на уровне файла.
+3. **Процесс:** предпросмотр (`dryRun`) → подтверждение → импорт. Preview = импорт с `dryRun=true` (без записи).
+4. **Лог импортов:** персистентный (кто/когда/файл/режим/counts/ошибки), отдельная вкладка.
+
+**Технические инварианты:**
+- RU-числа: нормализовать пробел-разряды и запятую-десятичный до записи.
+- Формат файла — `.xlsx` (переиспользовать multer + xlsx-инфру; маппинг колонок — на базе `crm-catalog-sheet-map.ts`).
+- Импорт использует существующий write-path создания/апдейта товара (валидации, транзакции), не пишет в БД в обход.
+- Импортированные товары — без категории → категоризация/фото потом в админке.
+- Не задевать google-sync legacy импорт и его формат.
+

@@ -1,7 +1,7 @@
 # MURU — Прогресс и память проекта
 
 Живой рабочий журнал. Обновляется в конце сессий. Версионируется git.
-Последнее обновление: 2026-07-31 (сессия 51: SF merge gate CLOSED — main @ 459eb90)
+Последнее обновление: 2026-08-06 (IMPORT-P2 ACCEPT @ a9b40ac; DEP-062 STOP pending)
 
 ## Архитектура (3 компонента)
 - **Telegram Mini App** — murushop.online (@murushop_bot), React+Vite / Express+TS+PostgreSQL, Beget VPS, PM2/nginx. Прод.
@@ -108,9 +108,67 @@
 - **Контакты/Клиентам visual + CMS — ВЫПОЛНЕН, ЗАДЕПЛОЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпты `2026-07-16-10` + `10b`, `@ 1db2365`): contacts/help visual; DEP-037.
 - **Admin fixed tabs Клиентам/Контакты — ВЫПОЛНЕН и ВЕРИФИЦИРОВАН 2026-07-16** (промпт `2026-07-16-11`, `@ 27256b2`, **ahead origin**): убрана вкладка «Страницы»; GET/PUT `pages/by-slug/:slug` allowlist help|contacts; FixedPageEditPage. Verify: tsc + service tests OK; route 401 = sandbox EPERM.
 
-**Storefront tip:** VPS `/var/www/muru-storefront` @ **`4795b25`** (`main`), API=`https://murushop.ru/api`, `NOINDEX=true`. **Backend tip:** prod `/var/www/muru` @ **`f75656f`** (`master`; 035/036 applied).
+**Storefront tip:** VPS `/var/www/muru-storefront` @ **`44e19de`** (`main`). **Backend tip:** prod `/var/www/muru` @ **`1dccd48`** (`master`).
 
 ## Следующее
+
+### ACCEPT: IMPORT-001 P1+P2 COMPLETE — **код OK, DEP-062 STOP** (2026-08-06)
+- P1 BE `d54f53c` + P2 admin `a9b40ac` на `feature/import-p2-admin` (P1 ancestor)
+- UI: `/catalog/import-export` — Импорт товаров → Лог → Экспорт → Google-реестр
+- Verify P2: admin `npm run build` OK; dryRun explicit; preview-file gate; upsert warn
+- Reports: [P1](.tasks/2026-08-06-SUPERVISOR-REPORT-IMPORT-P1.md) · [P2](.tasks/2026-08-06-SUPERVISOR-REPORT-IMPORT-P2.md)
+- Soft: UI hint «Стоимость ₽*» vs header «Стоимость, ₽*»; manual smoke before deploy
+- **Next:** STOP — merge → staging mig 041 + deploy → smoke → prod. **Не деплоить без гейта.**
+
+### Закрыто: subcategory visibility / listing / covers (2026-08-04…06) — **DEPLOYED**
+- Отчёт надзору: [`.tasks/2026-08-06-SUPERVISOR-REPORT-subcategory-fixes.md`](.tasks/2026-08-06-SUPERVISOR-REPORT-subcategory-fixes.md)
+- BE: `d6c5cfd` → `7052173` → `1dccd48` · SF: PR#7 `5de0868` → PR#8 `3673a38` → PR#9 `44e19de`
+- Soft: editable slug UX; Save-while-upload; staging sync
+
+### Закрыто: YK Mini App latency (`2026-08-04-YK-MA-LATENCY`) — **ACCEPTABLE / deferred**
+- Phase A: handler=`/api/payments/invoice` 200; MA **1.51 / 1.69 / 1.92 с** (≈1.7 с) до sheet; H5 без progress.
+- Phase B / split CDEK vs Telegram — **не делали** (оператор: сейчас нормально).
+- Решение: [`DECISIONS.md`](DECISIONS.md) **YK-001**. Reopen: Phase B prompt + runbook в `.tasks/2026-08-04-YK-MA-LATENCY-*` если задержка вернётся.
+- Report: [`.tasks/2026-08-04-YK-MA-LATENCY-SUPERVISOR-REPORT.md`](.tasks/2026-08-04-YK-MA-LATENCY-SUPERVISOR-REPORT.md)
+
+### ACCEPT: SF menu density + cart toast — code OK, **не закоммичено** (2026-08-04)
+- Промпт: [`.tasks/2026-08-04-SF-menu-cart-feedback.prompt.md`](.tasks/2026-08-04-SF-menu-cart-feedback.prompt.md)
+- Ветка `feat/menu-density-cart-toast` @ base `d5044cd` (banner PR #5); WT dirty + new toast component
+- Verify: denser menu; ephemeral toast 5s + partialize items-only; card stepper; PDP toast; tsc OK
+- Soft: PDP без stepper (только toast) — ок по отчёту
+- **Next:** commit → merge → VPS rebuild → smoke меню + add-to-cart toast
+
+### Закрыто: SF banner mobile contain — **MERGED** (PR #5 @ `d5044cd`)
+
+- Промпт: [`.tasks/2026-08-04-SF-banner-mobile-contain.prompt.md`](.tasks/2026-08-04-SF-banner-mobile-contain.prompt.md)
+- Ветка `fix/banner-mobile-contain` @ base `610565d` (mobile polish PR #4); 2 files WT dirty
+- Verify: `aspect-[4/3] bg-white` + `object-contain lg:object-cover`; tsc OK
+- **Next:** commit → merge → VPS rebuild → smoke Вдохновение mobile vs old.bitrix
+
+### Закрыто: SF mobile visual polish — **MERGED** (PR #4 @ `610565d`)
+
+- Промпт: [`.tasks/2026-08-04-SF-mobile-visual.prompt.md`](.tasks/2026-08-04-SF-mobile-visual.prompt.md)
+- Ветка `fix/mobile-visual-polish` @ base `6b7b38a` (favicon PR #3 in main); 5 files WT dirty
+- Verify: меню Logo+sr-only; rail/related `scroll-px-4`; footer h-8 brand; `mobileSectionTitleClass` 26px; nav 17px; tsc OK
+- Soft: iOS snap — проверить на устройстве после деплоя
+- **Next:** commit → merge → VPS rebuild
+
+### Закрыто: SF favicon + OG — **MERGED** (PR #3 @ `6b7b38a`)
+- Промпт: [`.tasks/2026-08-03-SF-favicon-og.prompt.md`](.tasks/2026-08-03-SF-favicon-og.prompt.md)
+- Ветка `feat/favicon-og` @ base `4763d3c` (hover PR #2 already in main); WT dirty
+- Verify: public icons + manifest MURU; `favicon.ico` 15086B; layout metadataBase/icons/OG; `absoluteAssetUrl` без trailing slash; fallback 512; PDP large_image; tsc OK
+- Soft: дефолтный OG квадрат 512 (не 1200×630) — ок до отдельного баннера
+- **Next:** commit → merge `main` → VPS rebuild → smoke favicon + opengraph.xyz
+
+### Закрыто: SF hover-variant — **DEPLOYED** (PR #2 @ `4763d3c`, 2026-08-03)
+- `@custom-variant hover` + `&:hover`; цвет «Каталог» снова `#5d6b3a` без наведения
+
+### Закрыто: SF brand + Yandex map + footer — **DEP-056 DEPLOYED** (2026-08-03)
+- VPS tip was `3c8cdf2` then hover `4763d3c`; favicon/OG — следующий деплой
+
+### Закрыто: SALE-PDP-404 — **DEPLOYED** (2026-08-03)
+- SF sale PDP hrefs OK; soft P1 CRM reassign 18 SKU
+- Handoff: `.tasks/2026-08-03-SUPERVISOR-REPORT-SESSION.md`
 
 ### Закрыто: EPIC Settings — DEP-055 **DEPLOYED** (2026-08-01)
 - STOP-4 staging-first → merge → prod: BE/admin `master` **`f75656f`** (+ test fix **`0eb8ba9`**, ahead origin), SF `main` **`4795b25`**.
@@ -624,6 +682,13 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 | DEP-053 | **Admin:** upload 15 MB + RU CRM errors + nginx 16m + Safari JSON parse | `muru-backend-local` / `master` (`ff8fddc`) | ACCEPT | **deployed** ✅ (2026-07-31) | FF merge + deploy.sh + sync-nginx; `client_max_body_size 16m` verified | soft: legacy TG-admin EN |
 | DEP-054 | **Home banner video:** migration `034` + ffmpeg upload + admin UI + SF `<video>` + nginx 64m | BE `8e146b9` + SF `main` `459eb90` | ACCEPT | **deployed** ✅ smoke OK; **SF merged to main** (2026-07-31) | apt ffmpeg; psql 034; deploy.sh; sync-nginx 64m; SF rebuild | video на главной подтверждён; VPS → checkout main |
 | DEP-055 | **EPIC Settings:** `site_settings` 035/036, CRM settings hub, public site-contacts/requisites, runtime-config CDEK/YK, SF contacts/legal/requisites | BE `f75656f` + SF `4795b25` | ACCEPT | **deployed** ✅ (2026-08-01) | staging 035→036 → prod migrate+deploy.sh; SF FF→main + rebuild | secrets stay in env (SET-001); legal via content_pages (SET-002) |
+| DEP-056 | **SF:** brand audit + Yandex contacts map + footer≈old.bitrix | `muru-storefront` / `main` @ `3c8cdf2` (PR #1) | ACCEPT | **deployed** ✅ (2026-08-03) | pull+build+pm2 restart | tip was `ec1d69b`→`3c8cdf2`; CMS 404 fallbacks pre-existing |
+| DEP-057 | **Subcategory visibility:** hide empty + junction DTO/filter + cover `?v=` + SF `categorySlugs` | BE `d6c5cfd` + SF `5de0868` | ACCEPT | **deployed** ✅ (2026-08-04) | mig 040 + deploy.sh; SF rebuild | follow-ups → DEP-058…061 |
+| DEP-058 | **CRM sub filter junction + block top slug** | BE `@ 7052173` | ACCEPT | **deployed** ✅ (2026-08-06) | `deploy.sh` | admin «Хранение» → MU0090 |
+| DEP-059 | **SF live sub redirects** (no leaf→parent 301) | SF PR #8 `@ 3673a38` | ACCEPT | **deployed** ✅ (2026-08-06) | SF rebuild | curl khranenie not 301 |
+| DEP-060 | **SF secondary sub listing** (cross-hub topByLeaf) | SF PR #9 `@ 44e19de` | ACCEPT | **deployed** ✅ (2026-08-06) | SF rebuild | MU0090 on Хранение listing |
+| DEP-061 | **BE skip crm_ cover invalidate** | BE `@ 1dccd48` | ACCEPT | **deployed** ✅ (2026-08-06) | `deploy.sh` + re-upload broken covers | report `.tasks/2026-08-06-SUPERVISOR-REPORT-subcategory-fixes.md` |
+| DEP-062 | **IMPORT-001:** clean XLSX product import (BE+admin) + mig 041 | `feature/import-p2-admin` @ `a9b40ac` (incl. P1 `d54f53c`) | ACCEPT P1+P2 | **STOP** pending | staging: psql 041 → deploy.sh → smoke → prod | google `POST /import` intact; reports IMPORT-P1/P2 |
 
 **Как обновлять:** оркестратор добавляет строку при verify prod-затрагивающей задачи; после деплоя Василий сообщает → колонка VPS = `deployed`, строка переносится в «Сделано» или помечается ✅.
 
@@ -631,7 +696,7 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 - Картинки плиток подкатегорий (пустые серые боксы) — фаза CMS; category-grid.tsx деградирует мягко. **+ cutover 2026-07-14:** топ-категории на `web.murushop.ru` — `adaptTree()` не мапит `coverImageUrl`; CRM-фото товаров на витрине — нужен `/img/` proxy как в mini app.
 - **Admin create product:** ~~route `products/new` bug~~ ✅ fix verified (`isNew = !id || id === 'new'`), DEP-019 deployed.
 - **Категории v2 admin follow-up:** preview обложек категорий/подкатегорий в `CategoriesPage` (raw Drive/CRM URL → `/img/`); ↑↓ reorder не меняет порядок, если все `sort_order=0` после бэкфилла (DEP-025).
-- **Пустые подкатегории в публичном дереве:** принято на staging-smoke — **оставляем** (решение A); фильтр пустых — отдельная правка по запросу.
+- **Пустые подкатегории в публичном дереве:** ~~оставляем (решение A)~~ → **отменено 2026-08-04** (`d6c5cfd`): empty subs скрыты; см. supervisor report subcategory-fixes.
 - ~~Схлопнуть две папки бэкенда в один git-репо с ветками (убрать merge-боль на cutover).~~ ✅ ЗАКРЫТО 2026-07-06 (унификация U1-U4, `MURU_miniAPP` заморожен `7877be1`, прод на каноне DEP-008).
 - `src/lib/content/collections.ts`: `productSlugs` у всех коллекций сейчас `[]` (раньше брались из mock-товаров, разорвано при выносе в статичный модуль) — заполнить реальными SKU после согласования наполнения лендингов с заказчиком.
 - CDEK debug-урок для памяти: ранний симптом «расчёт цены не приходит» (сессия 2026-07-02) свёлся к пустым CDEK-кредам в `.env` на момент теста — сам расчётный код был исправен с самого начала. Перед глубоким дебагом смотреть `.env` в первую очередь.
@@ -671,6 +736,19 @@ BE `37d8065` + SF `1e1cd36` на prod. Миграция 030. Оператор: �
 **Pending deploy:** merge `fix/admin-ui-polish` → `master` + VPS deploy (admin + backend reload, no migrations).
 
 ## Лог сессий
+- **2026-08-06 (IMPORT-P2 ACCEPT):** Verify `feature/import-p2-admin` @ `a9b40ac` (5 admin files); build OK; contracts+UX gate OK. IMPORT-001 code complete. **DEP-062 STOP** (staging-first). Report: `.tasks/2026-08-06-SUPERVISOR-REPORT-IMPORT-P2.md`.
+- **2026-08-06 (IMPORT-P1 ACCEPT):** Verify `feature/import-p1-products` @ `d54f53c`: 11 files; tsc OK; vitest 645/1; 041 on muru_local; contracts documented. Soft: upsert blank clears. Выдан **IMPORT-P2** admin. DEP-062 pending. Report: `.tasks/2026-08-06-SUPERVISOR-REPORT-IMPORT-P1.md`.
+- **2026-08-06 (subcategory fixes CLOSED):** Оператор: листинг «Хранение», secondary membership, cover — OK на проде. 6 фиксов DEP-057…061 deployed. Tips: BE `1dccd48`, SF `44e19de`. Отчёт надзору: `.tasks/2026-08-06-SUPERVISOR-REPORT-subcategory-fixes.md`. Soft: slug UX, Save-while-upload, staging sync.
+- **2026-08-04 (YK-MA-LATENCY CLOSED deferred):** Оператор: задержка сейчас приемлема → гейт закрыт без Phase B. Вердикт **ACCEPTABLE / deferred** (YK-001). Reopen при рецидиве: Phase A runbook + Phase B `[pay-timing]` уже в `.tasks/`.
+- **2026-08-04 (YK-MA-LATENCY Phase A CLOSED):** Prod handler `/api/payments/invoice` 200. MA stopwatch 1.51/1.69/1.92s (p50≈1.69) + YK UI after sheet; H5 double-tap feel. Web measure skipped (muru.ru subjective fast).
+- **2026-08-04 (YK-MA-LATENCY audit kickoff):** Директива надзора принята. Static path re-verify OK. Артефакты Phase A/B + SUPERVISOR-REPORT. Код оплаты не трогали.
+- **2026-08-03 (DEP-056 DEPLOYED):** VPS SF `ec1d69b`→`3c8cdf2`; build OK; pm2 online. CMS 404 fallbacks pre-existing. Оператор smoke contacts/footer/brand — pending.
+- **2026-08-03 (DEP-056 commit+PR):** `677260c` на `fix/brand-yandex-footer`, WT clean; PR #1 → main OPEN/MERGEABLE. tsc+CSP 2/2 re-verify OK. Next: merge + VPS deploy.
+- **2026-08-03 (оркестратор ACCEPT SF brand/Yandex/footer):** Verify 6 файлов на `fix/brand-yandex-footer` (uncommitted @ base `ec1d69b`). tsc OK, CSP vitest 2/2. DEP-056 pending commit+deploy. Soft: column headings в футере — отклонение от old, не блокер.
+- **2026-08-03 (SUPERVISOR HANDOFF):** Отчёт `.tasks/2026-08-03-SUPERVISOR-REPORT-SESSION.md` — PRICE-001, SALE-PDP-404, live pay web+MA OK; запрос аудита Mini App YK delay (`openInvoice` vs `openLink` + await create*).
+- **2026-08-03 (SALE-PDP-404 DEPLOYED):** VPS SF `@ ec1d69b`; live smoke sale→PDP OK, no `///`. Closed.
+- **2026-08-03 (SALE-PDP-404 ACCEPT):** SF `fix/sale-pdp-uncategorized-href` uncommitted @ `677205e` base. Diff 3 files OK; tsc + vitest 7/7. Next: commit/merge/deploy SF. P1 CRM categories later.
+- **2026-08-03 (SALE-PDP-404):** Анализ muru.ru «Распродажа → товар 404». Root cause: 18/19 sale SKU в «Без категории» → пустые `categorySlugs` → href `/catalog///{slug}/`. Mini App OK (SKU). Промпт `.tasks/2026-08-03-SALE-PDP-404.prompt.md` → storefront. Follow-up CRM reassign — отдельно.
 - **2026-08-01 (сессия Settings CLOSE + test fix):** DEP-055 deployed + QA GREEN. Test-only `0eb8ba9` — invoice env mock для runtime-config; vitest 562/0 fail; tsc OK; deploy не нужен. Push master optional.
 - **2026-08-01 (сессия Settings CLOSE):** **DEP-055 deployed + operator QA GREEN.** Staging → prod migrate 035/036; BE `f75656f` (PM2 ↺13); SF merge →`main` `4795b25`, VPS rebuild (PM2 ↺140). Smoke API + ручной фронт (admin/SF/checkout/Mini App) OK. Инцидент: VPS `checkout main` в `/var/www/muru` — откат на `master` @ `f75656f`. Docs: SET-001/002, API_CONTRACT, надзорный отчёт.
 - **2026-07-31 (сессия 51 MERGE GATE):** FF `feat/banner-video-sf` → `origin/main` @ **`459eb90`** (5 commits: M7+M8+M8-9+kitchen/collections+video). DEP-051/052 merge closed. Next: VPS checkout `main` + rebuild если ещё на feature.
